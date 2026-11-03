@@ -1,0 +1,768 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Japan Trip Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap">
+<style>
+/* Layout: 한 장짜리 여행 데스크. 위에 지도+입력, 아래로 항공 → 철도패스 → 일별 동선 → 상품. 모바일은 1열 */
+:root{
+  --bg:#F3F5F6; --surface:#FFFFFF; --surface2:#EAF0F2; --ink:#14212B; --muted:#586977; --line:#D6DEE3;
+  --accent:#0A6C74; --accent-ink:#FFFFFF; --sea:#CFE7E9; --red:#C0392B; --ok:#2C7A3F; --warn:#9A5B00; --warn-bg:#FFF3DD;
+  --land:#DDE5E8; --landline:#B7C3CA;
+  --f-body:"Zen Kaku Gothic New","Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo","Hiragino Sans","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E161C; --surface:#16212A; --surface2:#1D2B35; --ink:#E6EDF1; --muted:#9AAAB6; --line:#2B3B47;
+    --accent:#4DBCC4; --accent-ink:#06262A; --sea:#17323A; --red:#EE7B6D; --ok:#6BC283; --warn:#F0B35A; --warn-bg:#33270F;
+    --land:#26363F; --landline:#3F5562; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E161C; --surface:#16212A; --surface2:#1D2B35; --ink:#E6EDF1; --muted:#9AAAB6; --line:#2B3B47;
+  --accent:#4DBCC4; --accent-ink:#06262A; --sea:#17323A; --red:#EE7B6D; --ok:#6BC283; --warn:#F0B35A; --warn-bg:#33270F;
+  --land:#26363F; --landline:#3F5562; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding-block:20px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;gap:12px;align-items:center;min-width:0}
+.sun{width:34px;height:34px;border-radius:50%;background:var(--red);flex:none}
+h1{font-size:clamp(22px,4.4vw,32px);font-weight:900;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);max-width:62ch;margin:6px 0 0;font-size:14px}
+.ctl{display:flex;gap:8px;flex-wrap:wrap}
+select,input[type=number],input[type=date]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:40px;max-width:100%}
+select:focus-visible,input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.02em;min-width:0}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+h2{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:700}
+h3{font-size:19px;margin:0;font-weight:900;text-wrap:balance}
+.map{width:100%;height:auto;display:block;background:var(--sea);border-radius:10px}
+.map .land{fill:var(--land);stroke:var(--landline);stroke-width:1}
+.map .dot{cursor:pointer}
+.map .dot circle.vis{fill:var(--surface);stroke:var(--accent);stroke-width:2.5}
+.map .dot.on circle.vis{fill:var(--accent)}
+.map .dot text{font-size:11px;font-weight:700;fill:var(--ink);paint-order:stroke;stroke:var(--sea);stroke-width:3px;pointer-events:none}
+.map .dot text.n{fill:var(--accent-ink);stroke:none;font-family:var(--f-mono);font-size:10px;text-anchor:middle}
+.map .route{fill:none;stroke:var(--red);stroke-width:2;stroke-dasharray:5 4}
+.map .inset{fill:none;stroke:var(--landline);stroke-dasharray:3 3}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 11px;border-radius:99px;cursor:pointer;min-height:36px}
+.chip[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.fields .full{grid-column:1/-1}
+.styles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media(max-width:520px){.styles{grid-template-columns:minmax(0,1fr)}}
+.sty{border:1px solid var(--line);border-radius:10px;padding:10px;cursor:pointer;background:var(--surface);text-align:left;font:inherit;color:var(--ink)}
+.sty b{display:block;font-size:14px}.sty span{font-size:12px;color:var(--muted)}
+.sty[aria-pressed=true]{border-color:var(--accent);box-shadow:inset 0 0 0 2px var(--accent)}
+.go{font:inherit;font-weight:900;font-size:16px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 18px;min-height:46px;cursor:pointer;width:100%;margin-top:14px}
+.warn{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:10px}
+#out{margin-top:22px;display:flex;flex-direction:column;gap:18px}
+.chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-weight:700}
+.chain .arr{color:var(--muted)}
+.pill{display:inline-block;background:var(--surface2);border-radius:99px;padding:2px 9px;font-size:12px;color:var(--muted);font-weight:700}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.sumgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:12px}
+.stat{background:var(--surface2);border-radius:10px;padding:10px 12px}
+.stat small{display:block;color:var(--muted);font-size:12px}
+.stat b{font-size:20px;font-family:var(--f-mono);font-weight:600}
+.bar{display:grid;grid-template-columns:110px minmax(0,1fr) auto;gap:8px;align-items:center;font-size:13px;margin-top:6px}
+.bar i{display:block;height:10px;border-radius:5px;background:var(--accent)}
+.bar .tr{background:var(--surface2);border-radius:5px}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:520px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-size:12px;font-weight:700}
+td.r,th.r{text-align:right}
+.best{color:var(--ok);font-weight:900}
+.region{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.rhead{padding:14px 16px;background:var(--surface2);display:flex;flex-direction:column;gap:6px}
+.rhead .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.passbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:6px}
+.passbox div{background:var(--surface);border-radius:8px;padding:8px 10px;font-size:12px;color:var(--muted)}
+.passbox b{display:block;font-size:15px;color:var(--ink);font-family:var(--f-mono);font-weight:600}
+.day{padding:14px 16px;border-top:1px solid var(--line)}
+.dayh{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px}
+.dayh b{font-size:16px}
+.spot{position:relative;border:1px solid var(--line);border-radius:10px;padding:12px 12px 44px;margin-top:8px;background:var(--surface)}
+.spot.checked{background:var(--surface2)}
+.spot.checked .nm{text-decoration:line-through;text-decoration-thickness:1px}
+.spot .tm{font-family:var(--f-mono);font-size:12px;color:var(--accent);font-weight:600}
+.spot .nm{font-weight:900;font-size:16px;display:block}
+.spot .jp{color:var(--muted);font-size:12px}
+.spot p{margin:6px 0 0;font-size:13.5px}
+.spot .tip{color:var(--warn);font-size:13px;margin-top:6px}
+.spot .cost{font-family:var(--f-mono);font-size:12px;color:var(--muted);margin-top:6px}
+.done{position:absolute;right:10px;bottom:8px;display:flex;gap:7px;align-items:center;font-size:13px;font-weight:700;cursor:pointer;min-height:32px}
+.done input{width:20px;height:20px;accent-color:var(--accent);margin:0}
+.meal,.move{font-size:13px;color:var(--muted);padding:6px 2px}
+.move{color:var(--ink);background:var(--surface2);border-radius:8px;padding:8px 10px;margin-top:8px}
+.prod{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.prod a{display:block;border:1px solid var(--line);border-radius:10px;padding:12px;text-decoration:none;color:var(--ink);background:var(--surface)}
+.prod a:hover{border-color:var(--accent)}
+.prod small{color:var(--muted);display:block}
+.prod b{display:block}
+.prog{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:flex;gap:10px;align-items:center;font-size:13px;font-weight:700}
+.prog .tr{flex:1;height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.prog .tr i{display:block;height:100%;background:var(--ok)}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:10}
+.foot{font-size:12px;color:var(--muted)}
+.foot a{color:var(--accent)}
+.free{font-size:13px;color:var(--muted);padding:8px 2px}
+@media (prefers-reduced-motion:no-preference){.chip,.sty,.go{transition:background .15s,box-shadow .15s}}
+</style>
+
+<style>html{-webkit-text-size-adjust:100%}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head><body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="sun" aria-hidden="true"></div>
+      <div>
+        <h1 data-i="title"></h1>
+        <p class="sub" data-i="sub"></p>
+      </div>
+    </div>
+    <div class="ctl">
+      <label class="f"><span data-i="lang"></span>
+        <select id="lang" aria-label="Language"></select></label>
+      <label class="f"><span data-i="cur"></span>
+        <select id="cur"></select></label>
+    </div>
+  </header>
+
+  <div class="grid2">
+    <section class="panel" aria-labelledby="h-map">
+      <h2 id="h-map" data-i="s1"></h2>
+      <svg id="map" class="map" viewBox="0 0 400 450" role="img" aria-label="Map of Japan"></svg>
+      <div class="chips" id="chips"></div>
+      <p class="hint" data-i="s1hint"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="h-form">
+      <h2 id="h-form" data-i="s2"></h2>
+      <div class="fields">
+        <label class="f full"><span data-i="origin"></span><select id="origin"></select></label>
+        <label class="f"><span data-i="adults"></span><input id="adults" type="number" min="1" max="30" value="2"></label>
+        <label class="f"><span data-i="children"></span><input id="children" type="number" min="0" max="30" value="1"></label>
+        <label class="f"><span data-i="start"></span><input id="start" type="date"></label>
+        <label class="f"><span data-i="end"></span><input id="end" type="date"></label>
+        <label class="f full"><span data-i="lodging"></span><select id="lodge"></select></label>
+      </div>
+      <p class="hint" data-i="childhint"></p>
+      <h2 style="margin-top:16px" data-i="s3"></h2>
+      <div class="styles" id="styles"></div>
+      <button class="go" id="go" data-i="build"></button>
+      <div class="warn" id="msg" hidden></div>
+    </section>
+  </div>
+
+  <div id="out" aria-live="polite"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- i18n ---------- */
+var LANGS={ko:"한국어",en:"English",ja:"日本語",zh:"简体中文",es:"Español",fr:"Français"};
+var LOC={ko:"ko-KR",en:"en-US",ja:"ja-JP",zh:"zh-CN",es:"es-ES",fr:"fr-FR"};
+var T={
+title:{ko:"일본 여행 플래너",en:"Japan Trip Planner",ja:"日本旅行プランナー",zh:"日本旅行规划器",es:"Planificador de viaje a Japón",fr:"Planificateur de voyage au Japon"},
+sub:{ko:"지도에서 지역을 고르고 인원·일정·여행 스타일을 입력하면 항공편부터 숙소, 일별 동선, 패스 비교까지 한 번에 계획합니다.",en:"Pick regions on the map, then enter your group, dates and style. You get flights, lodging, a day-by-day route and pass comparisons in one plan.",ja:"地図で地域を選び、人数・日程・旅行スタイルを入力すると、航空券から宿泊、日別ルート、パス比較までまとめて作成します。",zh:"在地图上选择地区，输入人数、日期和旅行风格，即可一次生成机票、住宿、每日路线和交通券比较。",es:"Elige regiones en el mapa e indica grupo, fechas y estilo. Recibes vuelos, alojamiento, ruta diaria y comparación de pases en un solo plan.",fr:"Choisissez des régions sur la carte, puis indiquez groupe, dates et style. Vols, hébergement, itinéraire par jour et comparaison de pass en un seul plan."},
+lang:{ko:"언어",en:"Language",ja:"言語",zh:"语言",es:"Idioma",fr:"Langue"},
+cur:{ko:"표시 통화",en:"Currency",ja:"表示通貨",zh:"货币",es:"Moneda",fr:"Devise"},
+s1:{ko:"1. 여행 지역 선택",en:"1. Choose regions",ja:"1. 地域を選ぶ",zh:"1. 选择地区",es:"1. Elige regiones",fr:"1. Choisir les régions"},
+s1hint:{ko:"지도의 점이나 아래 버튼을 눌러 여러 곳을 고를 수 있습니다. 방문 순서는 이동시간이 가장 짧도록 자동 정렬됩니다. 지도는 위치 확인용 약도입니다.",en:"Tap dots or buttons to pick several. The visit order is sorted automatically to minimise travel time. The map is a schematic.",ja:"地図の点またはボタンで複数選択できます。訪問順は移動時間が最短になるよう自動で並べます。地図は略図です。",zh:"点击地图上的点或按钮可多选。游览顺序会自动按最短移动时间排列。地图为示意图。",es:"Toca los puntos o botones para elegir varias. El orden se calcula para minimizar el tiempo de viaje. El mapa es un esquema.",fr:"Touchez les points ou boutons pour en choisir plusieurs. L'ordre est calculé pour réduire le temps de trajet. La carte est schématique."},
+s2:{ko:"2. 인원·일정·숙소",en:"2. Group, dates, lodging",ja:"2. 人数・日程・宿泊",zh:"2. 人数、日期、住宿",es:"2. Grupo, fechas, alojamiento",fr:"2. Groupe, dates, hébergement"},
+origin:{ko:"출발 도시",en:"Departing from",ja:"出発地",zh:"出发城市",es:"Ciudad de salida",fr:"Ville de départ"},
+adults:{ko:"성인",en:"Adults",ja:"大人",zh:"成人",es:"Adultos",fr:"Adultes"},
+children:{ko:"아동 (6–11세)",en:"Children (6–11)",ja:"子供 (6–11歳)",zh:"儿童 (6–11岁)",es:"Niños (6–11)",fr:"Enfants (6–11)"},
+start:{ko:"출발일",en:"Start date",ja:"出発日",zh:"出发日期",es:"Fecha de inicio",fr:"Date de départ"},
+end:{ko:"귀국일",en:"End date",ja:"帰国日",zh:"返回日期",es:"Fecha de fin",fr:"Date de retour"},
+lodging:{ko:"숙소 유형",en:"Lodging type",ja:"宿泊タイプ",zh:"住宿类型",es:"Tipo de alojamiento",fr:"Type d'hébergement"},
+childhint:{ko:"6세 미만은 대부분 무료라 요금에 넣지 않았습니다. 6–11세는 철도·패스·입장료를 대개 반액으로 계산합니다.",en:"Under-6s are mostly free and are not priced. Ages 6–11 are priced at about half for rail, passes and admissions.",ja:"6歳未満はほとんど無料のため計上していません。6〜11歳は鉄道・パス・入場料を概ね半額で計算します。",zh:"6岁以下大多免费，未计入。6–11岁的铁路、交通券和门票按约半价计算。",es:"Menores de 6 años casi siempre gratis, no se cuentan. De 6 a 11 se calcula aprox. la mitad en tren, pases y entradas.",fr:"Les moins de 6 ans sont presque toujours gratuits et non comptés. De 6 à 11 ans : environ moitié prix pour train, pass et entrées."},
+s3:{ko:"3. 여행 스타일",en:"3. Travel style",ja:"3. 旅のスタイル",zh:"3. 旅行风格",es:"3. Estilo de viaje",fr:"3. Style de voyage"},
+eco:{ko:"알뜰 경제형",en:"Economy",ja:"節約",zh:"经济型",es:"Económico",fr:"Économique"},
+eco_d:{ko:"대중교통·패스·저가 식당",en:"Public transport, passes, casual food",ja:"公共交通・パス・気軽な食事",zh:"公共交通、交通券、平价餐饮",es:"Transporte público, pases, comida sencilla",fr:"Transports en commun, pass, repas simples"},
+com:{ko:"균형 편안형",en:"Comfort",ja:"快適",zh:"舒适型",es:"Confort",fr:"Confort"},
+com_d:{ko:"좋은 숙소와 식당, 패스 활용",en:"Good hotels and food, still uses passes",ja:"良い宿と食事、パスも活用",zh:"较好的酒店和餐厅，仍用交通券",es:"Buenos hoteles y comidas, con pases",fr:"Bons hôtels et repas, avec pass"},
+lux:{ko:"럭셔리 프라이빗",en:"Luxury & private",ja:"ラグジュアリー・貸切",zh:"奢华私享",es:"Lujo y privado",fr:"Luxe et privé"},
+lux_d:{ko:"전용 차량·가이드, 그린석, 고급 식사",en:"Private car and guide, Green Car, fine dining",ja:"専用車・ガイド、グリーン車、高級食事",zh:"专车导游、绿色车厢、高级餐饮",es:"Coche y guía privados, Green Car, alta cocina",fr:"Voiture et guide privés, Green Car, gastronomie"},
+lg_hostel:{ko:"호스텔·캡슐",en:"Hostel / capsule",ja:"ホステル・カプセル",zh:"青旅/胶囊",es:"Hostal / cápsula",fr:"Auberge / capsule"},
+lg_biz:{ko:"비즈니스 호텔",en:"Business hotel",ja:"ビジネスホテル",zh:"商务酒店",es:"Hotel de negocios",fr:"Hôtel d'affaires"},
+lg_apt:{ko:"아파트·민박(가족형)",en:"Apartment / rental",ja:"アパートメント・民泊",zh:"公寓/民宿",es:"Apartamento / alquiler",fr:"Appartement / location"},
+lg_ryokan:{ko:"료칸(2식 포함)",en:"Ryokan (2 meals)",ja:"旅館（2食付）",zh:"日式旅馆(含两餐)",es:"Ryokan (2 comidas)",fr:"Ryokan (2 repas)"},
+lg_lux:{ko:"럭셔리 호텔",en:"Luxury hotel",ja:"高級ホテル",zh:"豪华酒店",es:"Hotel de lujo",fr:"Hôtel de luxe"},
+build:{ko:"추천 일정 만들기",en:"Build my itinerary",ja:"おすすめ日程を作る",zh:"生成推荐行程",es:"Crear mi itinerario",fr:"Créer mon itinéraire"},
+noRegion:{ko:"지도에서 지역을 하나 이상 선택해 주세요.",en:"Select at least one region on the map.",ja:"地図で地域を1つ以上選んでください。",zh:"请在地图上至少选择一个地区。",es:"Elige al menos una región en el mapa.",fr:"Sélectionnez au moins une région."},
+minDays:{ko:"선택한 지역 수보다 일정이 짧습니다. 일정을 늘리거나 지역을 줄여 주세요. 최소 일수:",en:"The trip is shorter than the number of regions. Add days or remove regions. Minimum days:",ja:"日程が地域数より短いです。日数を増やすか地域を減らしてください。最低日数：",zh:"行程天数少于所选地区数。请增加天数或减少地区。最少天数：",es:"El viaje es más corto que el número de regiones. Añade días o quita regiones. Mínimo de días:",fr:"Le séjour est plus court que le nombre de régions. Ajoutez des jours ou retirez des régions. Minimum :"},
+badDates:{ko:"귀국일은 출발일 이후여야 합니다.",en:"The end date must be on or after the start date.",ja:"帰国日は出発日以降にしてください。",zh:"返回日期不能早于出发日期。",es:"La fecha de fin debe ser igual o posterior al inicio.",fr:"La date de retour doit être postérieure au départ."},
+tooLong:{ko:"일정은 최대 30일까지 지원합니다.",en:"Trips up to 30 days are supported.",ja:"日程は最大30日までです。",zh:"最多支持30天。",es:"Máximo 30 días.",fr:"30 jours maximum."},
+r_sum:{ko:"여행 요약",en:"Trip summary",ja:"旅行サマリー",zh:"行程概要",es:"Resumen",fr:"Résumé"},
+total:{ko:"예상 총액 (그룹)",en:"Estimated total (group)",ja:"概算合計（グループ）",zh:"预计总额(团体)",es:"Total estimado (grupo)",fr:"Total estimé (groupe)"},
+perP:{ko:"1인 평균",en:"Per person (avg)",ja:"1人あたり",zh:"人均",es:"Por persona",fr:"Par personne"},
+nightsL:{ko:"박",en:"nights",ja:"泊",zh:"晚",es:"noches",fr:"nuits"},
+daysL:{ko:"일",en:"days",ja:"日間",zh:"天",es:"días",fr:"jours"},
+c_flight:{ko:"국제선 항공",en:"International flights",ja:"国際線",zh:"国际机票",es:"Vuelos internacionales",fr:"Vols internationaux"},
+c_air:{ko:"국내선 항공",en:"Domestic flights",ja:"国内線",zh:"国内航班",es:"Vuelos domésticos",fr:"Vols intérieurs"},
+c_rail:{ko:"도시 간 철도",en:"Intercity rail",ja:"都市間鉄道",zh:"城际铁路",es:"Tren interurbano",fr:"Train intervilles"},
+c_local:{ko:"시내 교통·패스",en:"Local transport & passes",ja:"市内交通・パス",zh:"市内交通/交通券",es:"Transporte local y pases",fr:"Transport local et pass"},
+c_adm:{ko:"입장료·체험",en:"Admissions",ja:"入場料",zh:"门票",es:"Entradas",fr:"Entrées"},
+c_food:{ko:"식비",en:"Food",ja:"食費",zh:"餐饮",es:"Comidas",fr:"Repas"},
+c_lodge:{ko:"숙박",en:"Lodging",ja:"宿泊",zh:"住宿",es:"Alojamiento",fr:"Hébergement"},
+c_priv:{ko:"전용차량·프라이빗",en:"Private cars & transfers",ja:"専用車・送迎",zh:"专车与接送",es:"Coches privados y traslados",fr:"Voitures privées et transferts"},
+fl_title:{ko:"항공편",en:"Flights",ja:"航空券",zh:"机票",es:"Vuelos",fr:"Vols"},
+fl_in:{ko:"입국 공항",en:"Arrive at",ja:"到着空港",zh:"入境机场",es:"Llegada",fr:"Arrivée"},
+fl_out:{ko:"출국 공항",en:"Depart from",ja:"出発空港",zh:"出境机场",es:"Salida",fr:"Départ"},
+fl_time:{ko:"편도 비행시간(추정)",en:"One-way flight time (est.)",ja:"片道所要時間（目安）",zh:"单程飞行时间(估)",es:"Duración aprox. (ida)",fr:"Durée approx. (aller)"},
+fl_fare:{ko:"왕복 항공권 1인(추정)",en:"Round trip per adult (est.)",ja:"往復1人（概算）",zh:"往返人均(估)",es:"Ida y vuelta por adulto (aprox.)",fr:"A/R par adulte (approx.)"},
+fl_search:{ko:"Google 항공편에서 실제 요금 검색",en:"Search live fares on Google Flights",ja:"Googleフライトで実際の運賃を検索",zh:"在Google航班查询实时价格",es:"Buscar tarifas reales en Google Flights",fr:"Chercher les tarifs sur Google Flights"},
+fl_note:{ko:"출발 도시에 따라 직항이 없을 수 있습니다. 요금은 거리 기준 추정치이며 시즌에 따라 크게 달라집니다.",en:"A direct flight may not exist from your city. Fares are distance-based estimates and vary a lot by season.",ja:"出発地によっては直行便がない場合があります。運賃は距離に基づく概算で、時期により大きく変わります。",zh:"部分城市可能没有直飞。价格为按距离估算，随季节波动很大。",es:"Puede no haber vuelo directo. Tarifas estimadas por distancia; varían mucho según temporada.",fr:"Il peut ne pas y avoir de vol direct. Tarifs estimés selon la distance, très variables selon la saison."},
+route:{ko:"추천 방문 순서와 이동",en:"Recommended order & transfers",ja:"おすすめ順序と移動",zh:"推荐顺序与移动",es:"Orden recomendado y traslados",fr:"Ordre conseillé et trajets"},
+leg_from:{ko:"구간",en:"Leg",ja:"区間",zh:"区间",es:"Tramo",fr:"Trajet"},
+leg_line:{ko:"추천 노선",en:"Best line",ja:"おすすめ路線",zh:"推荐线路",es:"Línea",fr:"Ligne"},
+leg_time:{ko:"시간",en:"Time",ja:"時間",zh:"时间",es:"Tiempo",fr:"Durée"},
+leg_fare:{ko:"성인 요금",en:"Adult fare",ja:"大人運賃",zh:"成人票价",es:"Tarifa adulto",fr:"Tarif adulte"},
+leg_jr:{ko:"JR 패스",en:"JR Pass",ja:"JRパス",zh:"JR通票",es:"JR Pass",fr:"JR Pass"},
+jr_cov:{ko:"사용 가능",en:"Valid",ja:"利用可",zh:"可用",es:"Válido",fr:"Valide"},
+jr_part:{ko:"히카리·코다마만",en:"Hikari/Kodama only",ja:"ひかり・こだまのみ",zh:"仅光/回声号",es:"Solo Hikari/Kodama",fr:"Hikari/Kodama seulement"},
+jr_none:{ko:"불가 (사철)",en:"Not valid (private rail)",ja:"不可（私鉄）",zh:"不可(私铁)",es:"No válido (privado)",fr:"Non valide (privé)"},
+jr_air:{ko:"항공",en:"Flight",ja:"飛行機",zh:"航班",es:"Vuelo",fr:"Avion"},
+jr_title:{ko:"JR 패스 · 지역패스 비교",en:"JR Pass & regional pass comparison",ja:"JRパス・地域パス比較",zh:"JR通票与地区通票比较",es:"Comparación JR Pass y pases regionales",fr:"Comparaison JR Pass et pass régionaux"},
+jr_opt:{ko:"선택지",en:"Option",ja:"選択肢",zh:"方案",es:"Opción",fr:"Option"},
+jr_cost:{ko:"철도 총비용",en:"Rail total",ja:"鉄道合計",zh:"铁路合计",es:"Total tren",fr:"Total train"},
+jr_vs:{ko:"개별 구매 대비",en:"vs. tickets",ja:"個別購入比",zh:"相比单买",es:"vs. billetes",fr:"vs. billets"},
+jr_cash:{ko:"구간별 승차권 구매",en:"Buy tickets per leg",ja:"区間ごとに乗車券",zh:"逐段购票",es:"Billetes por tramo",fr:"Billets à l'unité"},
+jr_nat:{ko:"전국 JR 패스",en:"Nationwide JR Pass",ja:"全国JRパス",zh:"全国JR通票",es:"JR Pass nacional",fr:"JR Pass national"},
+jr_best:{ko:"추천",en:"Recommended",ja:"おすすめ",zh:"推荐",es:"Recomendado",fr:"Recommandé"},
+jr_none_needed:{ko:"이 일정에는 JR로 이동하는 장거리 구간이 없어 JR 패스가 필요 없습니다.",en:"This route has no long JR rides, so no JR pass is needed.",ja:"この日程にはJRの長距離移動がないため、JRパスは不要です。",zh:"此行程没有JR长途区间，无需JR通票。",es:"Esta ruta no tiene trayectos largos en JR; no hace falta pase.",fr:"Cet itinéraire n'a pas de long trajet JR ; aucun pass nécessaire."},
+jr_note:{ko:"전국 JR 패스 가격은 2026년 10월 1일 개정가(일반석 7일 ¥53,000 / 14일 ¥84,000 / 21일 ¥105,000, 아동 반액 수준)를 적용했습니다. 노조미·미즈호는 대상 외이며 히카리·사쿠라·카가야키 등은 사용 가능합니다. 시내 JR 이용분은 넣지 않은 보수적 계산이라 패스가 실제로는 조금 더 유리할 수 있습니다. 구매 전 공식 사이트에서 요금을 확인하세요.",en:"Nationwide JR Pass prices use the 1 Oct 2026 revision (Ordinary 7/14/21 days ¥53,000 / ¥84,000 / ¥105,000, children about half). Nozomi and Mizuho are not covered; Hikari, Sakura and Kagayaki are. Local JR rides are not counted, so the pass can be slightly better than shown. Check official sites before buying.",ja:"全国JRパスは2026年10月1日改定料金（普通車7/14/21日 ¥53,000 / ¥84,000 / ¥105,000、子供は約半額）で計算。のぞみ・みずほは対象外、ひかり・さくら・かがやきは利用可。市内JR利用分は含めていないため、実際はややパスが有利です。購入前に公式サイトで確認を。",zh:"全国JR通票按2026年10月1日新价(普通车7/14/21日 ¥53,000/¥84,000/¥105,000，儿童约半价)。希望号、瑞穗号不适用，光/樱/辉号可用。未计入市内JR乘坐，实际通票可能更划算。购买前请核对官网。",es:"JR Pass nacional con la tarifa del 1 oct 2026 (Ordinaria 7/14/21 días ¥53.000 / ¥84.000 / ¥105.000; niños aprox. mitad). Nozomi y Mizuho no están cubiertos; Hikari, Sakura y Kagayaki sí. No se cuentan los trayectos locales JR. Verifica en la web oficial.",fr:"JR Pass national au tarif du 1er oct. 2026 (Ordinaire 7/14/21 j : ¥53 000 / ¥84 000 / ¥105 000, enfants env. moitié). Nozomi et Mizuho exclus ; Hikari, Sakura et Kagayaki inclus. Les trajets JR locaux ne sont pas comptés. Vérifiez sur le site officiel."},
+jr_pick:{ko:"추천:",en:"Pick:",ja:"おすすめ：",zh:"推荐：",es:"Elegir:",fr:"Choix :"},
+saves:{ko:"절약",en:"saves",ja:"節約",zh:"节省",es:"ahorra",fr:"économise"},
+costsmore:{ko:"더 비쌈",en:"costs more",ja:"割高",zh:"更贵",es:"cuesta más",fr:"plus cher"},
+days_sec:{ko:"일별 추천 동선",en:"Day-by-day route",ja:"日別ルート",zh:"每日路线",es:"Ruta día a día",fr:"Itinéraire jour par jour"},
+day:{ko:"일차",en:"Day",ja:"日目",zh:"第",es:"Día",fr:"Jour"},
+arrive:{ko:"도착일: 입국 후 가볍게",en:"Arrival day: keep it light",ja:"到着日：軽めに",zh:"抵达日：轻松安排",es:"Día de llegada: plan ligero",fr:"Jour d'arrivée : léger"},
+depart:{ko:"출국일: 오전 일정만",en:"Departure day: morning only",ja:"出発日：午前のみ",zh:"离境日：仅上午",es:"Día de salida: solo mañana",fr:"Jour de départ : matin seulement"},
+travel:{ko:"이동일",en:"Travel day",ja:"移動日",zh:"移动日",es:"Día de traslado",fr:"Jour de trajet"},
+moveto:{ko:"이동:",en:"Transfer:",ja:"移動：",zh:"移动：",es:"Traslado:",fr:"Trajet :"},
+free:{ko:"여유일: 쉬거나 쇼핑, 근교 당일치기를 넣어 보세요.",en:"Flexible day: rest, shop, or add a day trip nearby.",ja:"自由日：休む・買い物・近郊への日帰りなどに。",zh:"自由日：休息、购物或安排近郊一日游。",es:"Día libre: descansar, comprar o excursión cercana.",fr:"Journée libre : repos, shopping ou excursion proche."},
+lunch:{ko:"점심",en:"Lunch",ja:"昼食",zh:"午餐",es:"Almuerzo",fr:"Déjeuner"},
+dinner:{ko:"저녁",en:"Dinner",ja:"夕食",zh:"晚餐",es:"Cena",fr:"Dîner"},
+tipL:{ko:"유의점",en:"Watch out",ja:"注意",zh:"注意",es:"Ojo",fr:"Attention"},
+adm:{ko:"성인 입장료",en:"Adult admission",ja:"大人入場料",zh:"成人门票",es:"Entrada adulto",fr:"Entrée adulte"},
+admFree:{ko:"무료",en:"Free",ja:"無料",zh:"免费",es:"Gratis",fr:"Gratuit"},
+covered:{ko:"패스로 무료",en:"free with pass",ja:"パスで無料",zh:"通票免费",es:"gratis con pase",fr:"gratuit avec pass"},
+done:{ko:"다녀왔어요",en:"Been there",ja:"行きました",zh:"去过了",es:"Ya fui",fr:"J'y suis allé"},
+prog:{ko:"다녀온 곳",en:"Visited",ja:"訪問済み",zh:"已去",es:"Visitados",fr:"Visités"},
+pass_cmp:{ko:"지역패스 비교 (이 지역 체류분, 그룹 합계)",en:"Regional pass comparison (this stay, whole group)",ja:"地域パス比較（この滞在分・グループ合計）",zh:"地区交通券比较(本地停留,团体合计)",es:"Comparación de pase regional (esta estancia, grupo)",fr:"Pass régional (ce séjour, groupe)"},
+withP:{ko:"패스 사용",en:"With pass",ja:"パス利用",zh:"用通票",es:"Con pase",fr:"Avec pass"},
+withoutP:{ko:"패스 미사용",en:"Without pass",ja:"パスなし",zh:"不用通票",es:"Sin pase",fr:"Sans pass"},
+diff:{ko:"차액",en:"Difference",ja:"差額",zh:"差额",es:"Diferencia",fr:"Écart"},
+usePass:{ko:"패스 사용 추천",en:"Use the pass",ja:"パス利用がお得",zh:"建议使用通票",es:"Conviene el pase",fr:"Le pass est avantageux"},
+skipPass:{ko:"패스 없이 이용 추천",en:"Skip the pass",ja:"パス不要",zh:"建议不买通票",es:"Mejor sin pase",fr:"Mieux sans pass"},
+noPass:{ko:"이 지역은 패스 대신 렌터카·택시가 일반적입니다. 아래 금액은 렌터카 기준입니다.",en:"Here a rental car or taxi is more common than a pass. Figures below assume a rental car.",ja:"この地域ではパスよりレンタカー・タクシーが一般的です。金額はレンタカー基準です。",zh:"此地区通常租车或打车而非买通票。金额按租车计算。",es:"Aquí es más común el coche de alquiler. Cifras con coche de alquiler.",fr:"Ici, la voiture de location est plus courante. Montants avec voiture de location."},
+privNote:{ko:"럭셔리 스타일은 전용 차량으로 이동하므로 총액에는 패스를 쓰지 않고 전용차량 비용을 넣었습니다.",en:"In Luxury style the total uses a private car instead of passes.",ja:"ラグジュアリーでは合計にパスではなく専用車の費用を入れています。",zh:"奢华风格的总额使用专车而非通票。",es:"En estilo Lujo, el total usa coche privado en vez de pases.",fr:"En style Luxe, le total compte une voiture privée au lieu des pass."},
+lodgeL:{ko:"숙박",en:"Stay",ja:"宿泊",zh:"住宿",es:"Estancia",fr:"Séjour"},
+rooms:{ko:"객실",en:"rooms",ja:"室",zh:"间",es:"hab.",fr:"ch."},
+prods:{ko:"스타일에 맞는 추천 상품",en:"Recommended products for your style",ja:"スタイルに合うおすすめ商品",zh:"适合你风格的推荐产品",es:"Productos recomendados",fr:"Produits recommandés"},
+search:{ko:"검색 열기",en:"Search",ja:"検索を開く",zh:"查看",es:"Buscar",fr:"Chercher"},
+disc:{ko:"모든 요금은 2026년 가을 기준 대략치(엔 기준)이며 환율·시즌·예약 시점에 따라 달라집니다. 입장 요금·운휴·예약 규칙은 방문 전에 공식 사이트에서 확인하세요. 아래 장소 설명은 한국어·영어로 제공되며 다른 언어에서는 영어로 표시됩니다. 그 밖의 언어는 브라우저 번역 기능을 사용하세요.",en:"All prices are rough autumn-2026 figures in yen and change with exchange rates, season and booking time. Check admission, closures and reservation rules on official sites before you go. Place notes are written in Korean and English; other languages show English. For other languages, use your browser's translate feature.",ja:"料金はすべて2026年秋時点の概算（円）で、為替・時期・予約時期で変わります。入場料・休業・予約ルールは訪問前に公式サイトで確認してください。スポット解説は韓国語・英語のみで、他の言語では英語表示です。その他の言語はブラウザの翻訳機能をご利用ください。",zh:"所有价格为2026年秋季的大致日元金额，会随汇率、季节和预订时间变化。出发前请在官网核对门票、休业和预约规则。景点说明仅有韩语和英语，其他语言显示英语。其他语言请使用浏览器翻译功能。",es:"Todos los precios son cifras aproximadas de otoño 2026 en yenes y cambian con el tipo de cambio, la temporada y la reserva. Consulta entradas, cierres y reservas en las webs oficiales. Las notas están en coreano e inglés; en otros idiomas se muestra inglés. Para otros idiomas usa el traductor del navegador.",fr:"Tous les prix sont des ordres de grandeur d'automne 2026 en yens, variables selon le change, la saison et la réservation. Vérifiez entrées, fermetures et réservations sur les sites officiels. Les notes sont en coréen et en anglais ; les autres langues affichent l'anglais. Pour les autres langues, utilisez la traduction du navigateur."},
+fx:{ko:"환율은 대략치입니다.",en:"Exchange rates are approximate.",ja:"為替は概算です。",zh:"汇率为估算。",es:"Tipos de cambio aproximados.",fr:"Taux approximatifs."}
+};
+function t(k){var o=T[k];return o?(o[S.lang]||o.en):k;}
+
+/* ---------- data ---------- */
+var CITIES={ICN:["Seoul","서울",37.46,126.44],PUS:["Busan","부산",35.18,128.94],TPE:["Taipei","타이베이",25.08,121.23],HKG:["Hong Kong","홍콩",22.31,113.92],PVG:["Shanghai","상하이",31.14,121.81],PEK:["Beijing","베이징",40.08,116.58],BKK:["Bangkok","방콕",13.69,100.75],SIN:["Singapore","싱가포르",1.36,103.99],KUL:["Kuala Lumpur","쿠알라룸푸르",2.75,101.71],MNL:["Manila","마닐라",14.51,121.02],SYD:["Sydney","시드니",-33.95,151.18],LAX:["Los Angeles","로스앤젤레스",33.94,-118.41],SFO:["San Francisco","샌프란시스코",37.62,-122.38],JFK:["New York","뉴욕",40.64,-73.78],YVR:["Vancouver","밴쿠버",49.19,-123.18],LHR:["London","런던",51.47,-0.45],CDG:["Paris","파리",49.01,2.55],FRA:["Frankfurt","프랑크푸르트",50.03,8.57],MAD:["Madrid","마드리드",40.49,-3.57],MEX:["Mexico City","멕시코시티",19.44,-99.07],GRU:["São Paulo","상파울루",-23.43,-46.47],SCL:["Santiago","산티아고",-33.39,-70.79],DXB:["Dubai","두바이",25.25,55.36],BOM:["Mumbai","뭄바이",19.09,72.87]};
+var GW={tokyo:["HND/NRT",35.55,139.78],osaka:["KIX",34.43,135.23],fukuoka:["FUK",33.59,130.45],sapporo:["CTS",42.78,141.69],okinawa:["OKA",26.2,127.65]};
+var GWN={tokyo:{en:"Tokyo (Haneda/Narita)",ko:"도쿄(하네다/나리타)"},osaka:{en:"Osaka (Kansai)",ko:"오사카(간사이)"},fukuoka:{en:"Fukuoka",ko:"후쿠오카"},sapporo:{en:"Sapporo (New Chitose)",ko:"삿포로(신치토세)"},okinawa:{en:"Okinawa (Naha)",ko:"오키나와(나하)"}};
+
+/* region: n names, ll, gw gateway + minutes to reach region from airport, w ideal days weight, lf lodging factor,
+   td local transit yen/person/day, tf fixed yen/person, car yen/day group, pass blocks [days,yen] */
+var R={
+sapporo:{n:{en:"Sapporo & Otaru",ko:"삿포로·오타루",ja:"札幌・小樽",zh:"札幌·小樽",es:"Sapporo y Otaru",fr:"Sapporo et Otaru"},lon:141.35,lat:43.06,gw:"sapporo",gm:50,w:2,lf:1.0,td:900,pn:{en:"Sapporo Subway 1-day",ko:"삿포로 지하철 1일권"},pb:[[1,830]],food:{en:"miso ramen, soup curry, seafood bowls",ko:"미소 라멘, 수프 카레, 해산물덮밥"},
+ prod:{eco:[["Otaru day trip (group bus tour)","오타루 당일 버스투어(그룹)","¥6,000–10,000 /p","Sapporo Otaru bus tour"]],lux:[["Private driver: Otaru, Niseko or Furano","전용기사: 오타루·니세코·후라노","¥90,000–140,000 /car/day","Sapporo private tour driver"]]}},
+tokyo:{n:{en:"Tokyo",ko:"도쿄",ja:"東京",zh:"东京",es:"Tokio",fr:"Tokyo"},lon:139.7,lat:35.68,gw:"tokyo",gm:60,w:3,lf:1.2,td:1000,pn:{en:"Tokyo Subway Ticket (24/48/72h)",ko:"도쿄 서브웨이 티켓(24/48/72시간)"},pb:[[1,800],[2,1200],[3,1500]],food:{en:"sushi, tsukemen, tempura, monjayaki",ko:"스시, 츠케멘, 튀김, 몬자야키"},
+ prod:{eco:[["Tokyo Subway Ticket + IC card","도쿄 서브웨이 티켓 + IC카드","¥800–1,500 /p","Tokyo Subway Ticket"]],lux:[["Private guide & chauffeur Tokyo","도쿄 전용 가이드·기사","¥80,000–130,000 /car/day","Tokyo private tour guide car"]]}},
+hakone:{n:{en:"Hakone & Fuji view",ko:"하코네·후지산",ja:"箱根",zh:"箱根",es:"Hakone",fr:"Hakone"},lon:139.0,lat:35.25,gw:"tokyo",gm:140,w:2,lf:1.35,td:3000,tf:4540,pn:{en:"Hakone Free Pass (2/3-day, from Shinjuku)",ko:"하코네 프리패스(2/3일, 신주쿠 출발)"},pb:[[2,6100],[3,6600]],food:{en:"onsen eggs, soba, kaiseki at the inn",ko:"온천 달걀, 소바, 숙소 가이세키"},
+ prod:{eco:[["Hakone Free Pass","하코네 프리패스","¥6,100–6,600 /p","Hakone Free Pass"]],lux:[["Ryokan with private open-air bath","객실 노천탕 료칸","¥60,000–150,000 /p/night","Hakone ryokan private onsen"]]}},
+kanazawa:{n:{en:"Kanazawa",ko:"가나자와",ja:"金沢",zh:"金泽",es:"Kanazawa",fr:"Kanazawa"},lon:136.65,lat:36.56,gw:"tokyo",gm:230,w:2,lf:0.95,td:700,pn:{en:"Kanazawa Loop Bus 1-day",ko:"가나자와 루프버스 1일권"},pb:[[1,600]],food:{en:"seafood at Omicho, gold-leaf sweets, nodoguro",ko:"오미초 해산물, 금박 디저트, 노도구로"},
+ prod:{eco:[["Kanazawa walking tour with local guide","가나자와 도보 가이드투어","¥3,000–6,000 /p","Kanazawa walking tour"]],lux:[["Private Kanazawa tea & craft experience","가나자와 프라이빗 다도·공예 체험","¥40,000–90,000 /group","Kanazawa private tea ceremony"]]}},
+kyoto:{n:{en:"Kyoto",ko:"교토",ja:"京都",zh:"京都",es:"Kioto",fr:"Kyoto"},lon:135.77,lat:35.01,gw:"osaka",gm:80,w:3,lf:1.15,td:1400,pn:{en:"Kyoto Subway & Bus 1-day",ko:"교토 지하철·버스 1일권"},pb:[[1,1100]],food:{en:"kaiseki, yudofu, matcha sweets, Nishiki snacks",ko:"가이세키, 유도후, 말차 디저트, 니시키 길거리 음식"},
+ prod:{eco:[["Kyoto small-group bike or walking tour","교토 소그룹 자전거·도보투어","¥5,000–9,000 /p","Kyoto small group tour"]],lux:[["Private Kyoto guide, geisha dinner","교토 프라이빗 가이드·게이샤 만찬","¥100,000–300,000 /group","Kyoto private guide geisha dinner"]]}},
+osaka:{n:{en:"Osaka & Nara",ko:"오사카·나라",ja:"大阪・奈良",zh:"大阪·奈良",es:"Osaka y Nara",fr:"Osaka et Nara"},lon:135.5,lat:34.69,gw:"osaka",gm:50,w:3,lf:1.0,td:900,pn:{en:"Osaka Amazing Pass (1/2-day)",ko:"오사카 주유패스(1/2일)"},pb:[[1,3500],[2,5000]],food:{en:"takoyaki, okonomiyaki, kushikatsu",ko:"타코야키, 오코노미야키, 쿠시카츠"},
+ prod:{eco:[["Osaka Amazing Pass 2-day","오사카 주유패스 2일권","¥5,000 /p","Osaka Amazing Pass"]],lux:[["Private Osaka and Nara chauffeur","오사카·나라 전용기사","¥80,000–120,000 /car/day","Osaka Nara private tour car"]]}},
+hiroshima:{n:{en:"Hiroshima & Miyajima",ko:"히로시마·미야지마",ja:"広島・宮島",zh:"广岛·宫岛",es:"Hiroshima y Miyajima",fr:"Hiroshima et Miyajima"},lon:132.46,lat:34.39,gw:"osaka",gm:100,w:2,lf:0.9,td:1300,pn:{en:"Hiroden + Miyajima ferry 1-day",ko:"히로덴 전차+미야지마 페리 1일권"},pb:[[1,900]],food:{en:"Hiroshima-style okonomiyaki, grilled oysters",ko:"히로시마식 오코노미야키, 구운 굴"},
+ prod:{eco:[["Peace Park guided walk (English/Korean)","평화공원 가이드 도보투어","¥2,000–5,000 /p","Hiroshima Peace Park guided tour"]],lux:[["Private Miyajima guide, ryokan stay","미야지마 프라이빗 가이드·료칸","¥70,000–200,000 /group","Hiroshima Miyajima private tour"]]}},
+fukuoka:{n:{en:"Fukuoka",ko:"후쿠오카",ja:"福岡",zh:"福冈",es:"Fukuoka",fr:"Fukuoka"},lon:130.4,lat:33.59,gw:"fukuoka",gm:25,w:2,lf:0.9,td:900,pn:{en:"Fukuoka Subway 1-day",ko:"후쿠오카 지하철 1일권"},pb:[[1,640]],food:{en:"tonkotsu ramen, motsunabe, yatai stalls",ko:"돈코츠 라멘, 모츠나베, 야타이 포장마차"},
+ prod:{eco:[["Dazaifu half-day tour from Hakata","하카타발 다자이후 반일투어","¥4,000–8,000 /p","Fukuoka Dazaifu tour"]],lux:[["Private Kyushu onsen day (Yufuin/Beppu)","규슈 프라이빗 온천일주(유후인·벳푸)","¥90,000–150,000 /car/day","Fukuoka private Yufuin tour"]]}},
+okinawa:{n:{en:"Okinawa",ko:"오키나와",ja:"沖縄",zh:"冲绳",es:"Okinawa",fr:"Okinawa"},lon:127.68,lat:26.21,gw:"okinawa",gm:30,w:3,lf:1.0,td:0,car:9000,pn:null,food:{en:"Okinawa soba, goya champuru, awamori",ko:"오키나와 소바, 고야 챔플루, 아와모리"},
+ prod:{eco:[["Rental car (4–5 seats) with full insurance","렌터카(4–5인승) 풀커버","¥8,000–10,000 /car/day","Okinawa rental car"]],lux:[["Private yacht or Kerama island charter","프라이빗 요트·케라마 제도 차터","¥150,000–400,000 /group","Okinawa private yacht charter"]]}}
+};
+var MAPLL={sapporo:[8,-9,"start"],tokyo:[10,4,"start"],hakone:[8,16,"start"],kanazawa:[-9,-8,"end"],kyoto:[-9,-9,"end"],osaka:[-9,15,"end"],hiroshima:[-9,-9,"end"],fukuoka:[8,18,"start"],okinawa:[12,4,"start"]};
+
+/* spots: id, ja, en, ko, adult yen, cluster, priority (1 best), hours, passCovered, note en, note ko, tip en, tip ko */
+var SP={
+sapporo:[
+["sp1","大通公園・さっぽろテレビ塔","Odori Park & Sapporo TV Tower","오도리 공원·삿포로 TV타워",1000,0,2,1.5,0,"Green boulevard through the city centre with views from the tower.","도심을 가로지르는 녹지 대로, 타워에서 시내 전경을 볼 수 있습니다.","Snow Festival (Feb) and Beer Garden (summer) fill the park.","2월 눈축제·여름 비어가든 기간엔 매우 붐빕니다."],
+["sp2","北海道神宮","Hokkaido Shrine & Maruyama Park","홋카이도 신궁·마루야마 공원",0,0,3,1.5,0,"Quiet forest shrine, a calm start to the day.","숲속의 조용한 신궁, 하루를 차분히 시작하기 좋습니다.","Try the famous Rokkatei-style sweets near the gate.","입구 근처에서 지역 명과를 맛보세요."],
+["sp3","小樽運河・堺町通り","Otaru Canal & Sakaimachi Street","오타루 운하·사카이마치 거리",0,1,1,3.5,0,"Atmospheric canal with glass shops and sushi. Rapid train from Sapporo takes about 40 minutes.","유리 공방과 스시 가게가 늘어선 운하 거리. 삿포로에서 쾌속열차로 약 40분.","Many shops close by 18:00; go early. Winter paths are icy.","상점이 18시경 닫으니 일찍 가세요. 겨울엔 길이 빙판입니다."],
+["sp4","サッポロビール博物館","Sapporo Beer Museum","삿포로 맥주 박물관",0,2,3,1.5,0,"Free history exhibition; paid tasting set at the end.","전시는 무료, 마지막에 유료 시음 세트가 있습니다.","Tastings are paid and adults only; kids can skip.","시음은 유료·성인 전용입니다."],
+["sp5","藻岩山ロープウェイ","Mt. Moiwa Ropeway night view","모이와산 로프웨이 야경",2100,2,2,2,0,"One of Japan's top-3 night views, reached by ropeway and mini cable car.","일본 3대 야경으로 꼽히며 로프웨이와 미니케이블카로 올라갑니다.","Dress warmly; it is much colder at the summit.","정상은 시내보다 훨씬 춥습니다."]],
+tokyo:[
+["t1","浅草寺・仲見世","Senso-ji & Nakamise","센소지·나카미세 거리",0,0,1,2,0,"Tokyo's oldest temple with a lively approach street.","도쿄에서 가장 오래된 사찰과 활기찬 참배길.","Go before 9:00 or after 17:00 to avoid tour crowds.","9시 전이나 17시 이후가 한산합니다."],
+["t2","上野恩賜公園・東京国立博物館","Ueno Park & Tokyo National Museum","우에노 공원·도쿄국립박물관",1000,0,3,2.5,0,"Japan's largest art and history collection, with zoo and ponds nearby.","일본 최대 규모의 미술·역사 컬렉션, 근처에 동물원과 연못도 있습니다.","Museums close Mondays.","박물관은 월요일 휴관이 많습니다."],
+["t3","明治神宮・原宿","Meiji Jingu & Harajuku","메이지 신궁·하라주쿠",0,1,1,2,0,"Forest shrine in the city, then Takeshita Street pop culture.","도심 속 숲길 신궁과 다케시타 거리의 팝 문화.","Weekends on Takeshita Street are shoulder to shoulder.","주말 다케시타 거리는 사람으로 가득합니다."],
+["t4","渋谷スクランブルスクエア SHIBUYA SKY","SHIBUYA SKY & Scramble Crossing","시부야 스카이·스크램블 교차로",2200,1,1,1.5,0,"Open-air rooftop deck above the famous crossing.","유명한 교차로 위 야외 옥상 전망대.","Book a sunset slot online days ahead; bags go in lockers.","일몰 시간대는 며칠 전 온라인 예약, 짐은 사물함에 보관합니다."],
+["t5","チームラボ プラネッツ","teamLab Planets","팀랩 플래닛츠",3800,2,2,2.5,0,"Walk barefoot through water and mirrored light rooms.","맨발로 물과 거울 빛의 방을 걷는 몰입형 전시.","Timed tickets sell out; wear shorts, skirts are awkward in mirrors.","시간 지정권이 매진되기 쉽고, 바닥 거울 때문에 치마는 불편합니다."],
+["t6","豊洲市場・築地場外市場","Toyosu / Tsukiji Outer Market","도요스 시장·쓰키지 외시장",0,2,2,1.5,0,"Breakfast of tamagoyaki, seafood skewers and sushi.","달걀말이, 해산물 꼬치, 스시로 아침 식사.","Many stalls close by early afternoon and on some Sundays.","많은 가게가 이른 오후에 닫고 일요일 휴무도 있습니다."],
+["t7","新宿御苑","Shinjuku Gyoen","신주쿠 교엔",500,1,3,1.5,0,"Spacious garden, great for kids and for autumn colour.","넓은 정원으로 아이 동반과 단풍 감상에 좋습니다.","No alcohol and no ball games inside.","음주와 공놀이는 금지입니다."]],
+hakone:[
+["h1","箱根周遊ルート（登山電車・ロープウェイ・海賊船）","Hakone Loop: Tozan train, ropeway, pirate ship","하코네 순환코스(등산열차·로프웨이·해적선)",0,0,1,4.5,1,"The classic circuit with Owakudani volcanic valley and Lake Ashi. Included in the Free Pass.","오와쿠다니 화산 계곡과 아시호 호수를 도는 대표 코스. 프리패스에 포함됩니다.","The ropeway stops in strong wind or gas alerts; check status that morning.","강풍·가스 경보 시 로프웨이가 운행 중단되니 당일 아침 운행 정보를 확인하세요."],
+["h2","彫刻の森美術館","Hakone Open-Air Museum","조각의 숲 미술관",2500,0,2,2,0,"Sculptures set in the mountains, with a Picasso hall and a foot-bath.","산속에 놓인 조각 작품, 피카소관과 족욕탕이 있습니다.","Free Pass shows a small discount at the ticket desk.","프리패스 제시 시 약간 할인됩니다."],
+["h3","箱根神社・平和の鳥居","Hakone Shrine & Lake Ashi torii","하코네 신사·평화의 도리이",0,1,1,1.5,0,"Torii standing in the lake, a classic photo spot.","호수 위에 선 도리이, 대표 사진 명소.","Photo queue can be 30+ minutes on weekends.","주말에는 촬영 대기가 30분 이상입니다."],
+["h4","日帰り温泉（天山など）","Day-use onsen","당일 온천",1500,1,2,2,0,"Soak after walking. Many baths offer outdoor pools.","걷고 난 뒤 온천욕. 노천탕이 있는 곳이 많습니다.","Tattoos may be refused; check the sign or book a private bath.","문신은 입장이 제한될 수 있어 가족탕을 예약하세요."]],
+kanazawa:[
+["k1","兼六園","Kenroku-en Garden","겐로쿠엔",320,0,1,2,0,"One of Japan's three great gardens, famous for yukitsuri snow ropes in winter.","일본 3대 정원 중 하나, 겨울 유키쓰리가 유명합니다.","Opens early (7:00); mornings are quiet.","7시에 열어 아침이 한적합니다."],
+["k2","金沢城公園","Kanazawa Castle Park","가나자와성 공원",320,0,3,1,0,"Restored turrets and a wide lawn next to Kenroku-en.","겐로쿠엔 바로 옆의 복원 망루와 잔디밭.","Park is free; paid area is the main buildings only.","공원은 무료, 건물 내부만 유료입니다."],
+["k3","ひがし茶屋街","Higashi Chaya District","히가시 차야 거리",0,1,1,1.5,0,"Preserved geisha district with gold-leaf cafes.","금박 카페가 있는 옛 게이샤 거리.","Gold-leaf soft serve is photogenic but pricey (around ¥900).","금박 소프트아이스크림은 약 ¥900로 비쌉니다."],
+["k4","近江町市場","Omicho Market","오미초 시장",0,1,2,1,0,"Seafood bowls and snow crab in season.","해산물 덮밥과 제철 게 요리.","Most stalls close around 17:00.","대부분 17시경 문을 닫습니다."],
+["k5","金沢21世紀美術館","21st Century Museum","21세기 미술관",450,0,2,1.5,0,"Free public zones including the famous Swimming Pool work; paid special exhibits.","수영장 작품 등 일부 공간은 무료, 기획전은 유료.","Closed Mondays.","월요일 휴관입니다."]],
+kyoto:[
+["ky1","伏見稲荷大社","Fushimi Inari Taisha","후시미 이나리 신사",0,2,1,2,0,"Thousands of vermilion gates up the mountain.","산을 오르는 수천 개의 붉은 도리이.","Go early or at dusk; summit loop is about 2 hours, with kids stop at Yotsutsuji.","이른 아침이나 해질녘이 좋고, 아이 동반 시 요쓰쓰지까지만 가도 충분합니다."],
+["ky2","清水寺","Kiyomizu-dera","기요미즈데라",500,0,1,2,0,"Wooden stage over the hillside, with views of the city.","언덕에 걸린 목조 무대와 시내 전망.","Opens at 6:00; arrive first thing. Evening illumination in autumn requires separate tickets.","6시 개문, 첫 시간대가 좋습니다. 가을 야간 특별개장은 별도 요금입니다."],
+["ky3","祇園・花見小路","Gion & Hanamikoji","기온·하나미코지",0,0,2,1.5,0,"Old teahouse lanes where you may spot maiko at dusk.","저녁 무렵 마이코를 볼 수도 있는 옛 찻집 골목.","Do not chase or photograph geisha on private lanes; fines apply.","게이샤를 쫓아가 촬영하는 행위는 금지이며 과태료가 있습니다."],
+["ky4","嵐山竹林の道・天龍寺","Arashiyama Bamboo Grove & Tenryu-ji","아라시야마 대나무숲·덴류지",500,1,1,2.5,0,"Bamboo path, temple garden and the river.","대나무길, 사찰 정원, 강변 산책.","Crowded from 9:00; before 8:00 is best.","9시 이후 혼잡하므로 8시 전이 좋습니다."],
+["ky5","金閣寺","Kinkaku-ji","금각사",500,1,2,1,0,"Gold pavilion beside a mirror pond.","연못 옆에 선 황금빛 누각.","Short visit, about 40 minutes; combine with Arashiyama by bus.","관람은 40분 정도, 아라시야마와 버스로 묶으세요."],
+["ky6","錦市場","Nishiki Market","니시키 시장",0,0,3,1,0,"A five-block food alley with pickles, tofu and skewers.","절임, 두부, 꼬치가 모인 먹거리 골목.","Eating while walking is discouraged; use the stall's eat-in area.","걸어 다니며 먹는 것은 자제하고 가게 앞 취식 공간을 이용하세요."]],
+osaka:[
+["o1","大阪城天守閣","Osaka Castle","오사카성",1200,0,1,2,1,"Museum inside the keep with a view from the top floor.","천수각 안은 박물관이고 꼭대기 층에서 전망을 봅니다.","The park is free; only the keep needs a ticket. Free with Amazing Pass.","공원은 무료이며 천수각만 유료입니다. 주유패스로 무료입니다."],
+["o2","梅田スカイビル 空中庭園","Umeda Sky Building Floating Garden","우메다 스카이빌딩 공중정원",2000,1,2,1.5,1,"360-degree open-air deck 173 m up.","173m 높이의 360도 야외 전망대.","Amazing Pass free entry only until 15:00; sunset needs a paid ticket.","주유패스 무료 입장은 15시까지입니다. 일몰은 유료 입장입니다."],
+["o3","道頓堀・難波","Dotonbori & Namba","도톤보리·난바",0,2,1,2.5,0,"Neon canal street, takoyaki and the Glico sign.","네온 운하 거리, 타코야키와 글리코 간판.","Very crowded on Halloween and weekends; keep kids by the hand.","핼러윈·주말엔 극도로 혼잡하니 아이 손을 꼭 잡으세요."],
+["o4","新世界・通天閣","Shinsekai & Tsutenkaku","신세카이·츠텐카쿠",1500,2,3,2,1,"Retro downtown with kushikatsu and the tower deck.","쿠시카츠 골목이 있는 레트로 거리와 전망대.","Time-slot reservation is required on site for the slider.","슬라이드는 현장 시간대 예약이 필요합니다."],
+["o5","奈良公園・東大寺","Nara Park & Todai-ji","나라 공원·도다이지",800,3,2,4.5,0,"Free-roaming deer and the Great Buddha Hall. About 45 minutes from Osaka-Namba.","자유롭게 다니는 사슴과 대불전. 오사카난바에서 약 45분.","Deer bite and butt; buy deer crackers only for feeding and keep food hidden. Amazing Pass does not cover Kintetsu to Nara.","사슴이 물거나 들이받을 수 있으니 먹이는 전용 센베이만 쓰고 음식은 숨기세요. 주유패스는 킨테쓰 나라선에 쓸 수 없습니다."],
+["o6","海遊館","Kaiyukan Aquarium","가이유칸 수족관",2700,1,3,3,0,"One of the world's large aquariums, whale shark tank.","고래상어가 있는 세계적인 대형 수족관.","Not covered by Amazing Pass; buy tickets online to skip the queue.","주유패스 대상이 아니며 온라인 예매가 대기 줄을 줄여 줍니다."]],
+hiroshima:[
+["hi1","平和記念公園・資料館","Peace Memorial Park & Museum","평화기념공원·자료관",200,0,1,3,0,"Atomic Bomb Dome, memorial and the museum.","원폭 돔, 위령비와 자료관.","Some exhibits are graphic; consider this for younger children.","일부 전시가 충격적일 수 있어 어린 자녀는 사전에 고려하세요."],
+["hi2","広島城","Hiroshima Castle","히로시마성",370,0,3,1,0,"Reconstructed castle with a small museum and moat.","해자와 작은 박물관이 있는 복원 성.","Skip if tight on time.","시간이 부족하면 생략해도 됩니다."],
+["hi3","宮島・厳島神社","Miyajima & Itsukushima Shrine","미야지마·이쓰쿠시마 신사",400,1,1,5,0,"Floating torii and deer. JR ferry from Miyajimaguchi takes 10 minutes.","바다 위 도리이와 사슴. 미야지마구치에서 JR 페리로 10분.","Check tide tables: at low tide you can walk to the torii, at high tide it floats.","물때를 확인하세요. 썰물엔 도리이까지 걸어가고 밀물엔 떠 있는 모습입니다."],
+["hi4","弥山ロープウェイ","Mt. Misen Ropeway","미센산 로프웨이",2000,1,2,2,0,"Panorama of the Seto Inland Sea.","세토 내해 전망.","Add 30 min walk from top station to the summit.","정상역에서 정상까지 도보 30분이 더 걸립니다."]],
+fukuoka:[
+["f1","大濠公園・福岡城跡","Ohori Park & Fukuoka Castle ruins","오호리 공원·후쿠오카성터",0,0,3,1.5,0,"Lakeside park for a gentle walk.","호수를 따라 걷는 편안한 공원.","Pair with the Fukuoka Art Museum if raining.","비 오는 날엔 후쿠오카 미술관과 묶으세요."],
+["f2","キャナルシティ・中洲屋台","Canal City & Nakasu yatai","캐널시티·나카스 야타이",0,0,1,2.5,0,"Mall fountain show by day, outdoor yatai stalls by night.","낮엔 분수쇼, 밤엔 야타이 포장마차.","Yatai seat 6–8 people; wait times at 19:00–21:00 can be long.","야타이는 6~8석뿐이라 19~21시 대기가 깁니다."],
+["f3","太宰府天満宮","Dazaifu Tenmangu","다자이후 텐만구",0,1,1,3,0,"Shrine of learning with plum trees; try umegae mochi.","학문의 신을 모신 신사, 매화 떡 우메가에모치가 명물.","Direct train from Tenjin takes about 40 minutes.","덴진에서 전철로 약 40분입니다."],
+["f4","福岡タワー","Fukuoka Tower","후쿠오카 타워",800,0,3,1,0,"Bay-front observation deck.","해안가 전망대.","Best at dusk.","해질 무렵이 가장 좋습니다."],
+["f5","櫛田神社","Kushida Shrine","구시다 신사",0,0,2,1,0,"The shrine behind the Hakata Gion Yamakasa festival floats.","하카타 기온 야마카사 축제의 신사.","Short stop; right near Canal City.","캐널시티 바로 옆이라 짧게 들르기 좋습니다."]],
+okinawa:[
+["ok1","国際通り・牧志公設市場","Kokusai-dori & Makishi Market","국제거리·마키시 공설시장",0,0,1,2.5,0,"Naha's main street and the market where you can eat upstairs.","나하의 중심 거리와 위층에서 먹을 수 있는 시장.","Market is busiest at lunch; many stalls close on Sundays.","점심에 가장 붐비고 일요일 휴무인 가게가 있습니다."],
+["ok2","首里城公園","Shuri Castle Park","슈리성 공원",400,0,2,2,0,"Ryukyu kingdom site; the main hall is being rebuilt, with a viewing area.","류큐 왕국의 성터. 정전은 복원 공사 중이며 견학 구역이 있습니다.","Check what is open; reconstruction schedules change.","개방 구역은 공사 일정에 따라 바뀌니 확인하세요."],
+["ok3","沖縄美ら海水族館","Churaumi Aquarium","추라우미 수족관",2180,1,1,3,0,"Whale shark tank in Ocean Expo Park. About 2 hours by car from Naha.","해양박람공원의 고래상어 수조. 나하에서 차로 약 2시간.","Cheaper after 16:00 on the discounted time slot; check the day's price.","16시 이후 할인 시간대가 있으니 당일 요금을 확인하세요."],
+["ok4","万座毛","Cape Manza","만자모",120,1,3,1,0,"Elephant-trunk shaped cliff over blue sea.","코끼리 코 모양 절벽과 푸른 바다.","On the way to the aquarium.","수족관 가는 길에 있습니다."]]
+};
+
+var LG={hostel:{unit:"p",y:4500,e:{en:"bed",ko:"침대"}},biz:{unit:"room",y:11000,cap:2},apt:{unit:"room",y:22000,cap:4},ryokan:{unit:"p",y:28000},lux:{unit:"room",y:65000,cap:2}};
+var MEAL={eco:[1200,2000],com:[2500,5500],lux:[9000,32000]};
+var FOODDAY={eco:3500,com:8000,lux:42000};
+var STY={eco:{cap:3,fm:2.2,km:1},com:{cap:3,fm:1.6,km:1.0},lux:{cap:2,fm:3.6,km:1.4}};
+
+/* intercity legs: [min, yen, jr, line en, line ko] */
+var LEG={
+"hakone|tokyo":[85,2470,"none","Odakyu Romancecar (Shinjuku to Hakone-Yumoto)","오다큐 로망스카(신주쿠→하코네유모토)"],
+"kanazawa|tokyo":[150,14380,"cov","Hokuriku Shinkansen Kagayaki (Tokyo to Kanazawa)","호쿠리쿠 신칸센 카가야키(도쿄→가나자와)"],
+"kyoto|tokyo":[135,14170,"part","Tokaido Shinkansen: Nozomi 2h15 (fastest, not on JR Pass) or Hikari 2h40","도카이도 신칸센 노조미 2시간15분(최단, JR패스 불가) 또는 히카리 2시간40분"],
+"osaka|tokyo":[150,14720,"part","Tokaido Shinkansen: Nozomi 2h30 or Hikari 3h","도카이도 신칸센 노조미 2시간30분 또는 히카리 3시간"],
+"hiroshima|tokyo":[240,19000,"part","Tokaido+Sanyo Shinkansen: Nozomi 4h or Hikari+Sakura 4h40","도카이도·산요 신칸센 노조미 4시간 또는 히카리+사쿠라 4시간40분"],
+"fukuoka|tokyo":[300,23000,"part","Shinkansen 5h, or a flight Haneda–Fukuoka 2h (about ¥12,000–25,000)","신칸센 5시간 또는 하네다–후쿠오카 항공 2시간(약 ¥12,000–25,000)"],
+"kanazawa|kyoto":[135,7200,"cov","Limited Express Thunderbird (Kanazawa to Kyoto)","특급 선더버드(가나자와→교토)"],
+"kanazawa|osaka":[160,7600,"cov","Limited Express Thunderbird (Kanazawa to Osaka)","특급 선더버드(가나자와→오사카)"],
+"kyoto|osaka":[30,580,"cov","JR Special Rapid, Kyoto to Osaka","JR 신쾌속 교토→오사카"],
+"hiroshima|kyoto":[110,11000,"cov","Sanyo Shinkansen Sakura via Shin-Osaka","산요 신칸센 사쿠라(신오사카 환승)"],
+"hiroshima|osaka":[90,10500,"cov","Sanyo Shinkansen Sakura (Shin-Osaka to Hiroshima)","산요 신칸센 사쿠라(신오사카→히로시마)"],
+"fukuoka|hiroshima":[65,10000,"cov","Sanyo/Kyushu Shinkansen Sakura (Hiroshima to Hakata)","산요·규슈 신칸센 사쿠라(히로시마→하카타)"],
+"fukuoka|kyoto":[170,16500,"cov","Sanyo/Kyushu Shinkansen Sakura via Shin-Osaka","산요·규슈 신칸센 사쿠라(신오사카 환승)"],
+"fukuoka|osaka":[150,15400,"cov","Sanyo/Kyushu Shinkansen Sakura (Shin-Osaka to Hakata)","산요·규슈 신칸센 사쿠라(신오사카→하카타)"]
+};
+function key(a,b){return a<b?a+"|"+b:b+"|"+a;}
+function leg(a,b){
+  var k=key(a,b);
+  if(LEG[k]){var L=LEG[k];return{min:L[0],yen:L[1],jr:L[2],en:L[3],ko:L[4],air:false};}
+  if(a==="sapporo"||b==="sapporo"||a==="okinawa"||b==="okinawa"){
+    var o=(a==="sapporo"||a==="okinawa")?b:a, hub=(a==="sapporo"||a==="okinawa")?a:b;
+    var y,m;
+    if(hub==="sapporo"){y=o==="tokyo"?14000:(o==="osaka"||o==="kyoto")?18000:22000;m=o==="tokyo"?170:230;}
+    else{y=o==="fukuoka"?15000:o==="osaka"||o==="kyoto"?18000:o==="tokyo"||o==="hakone"?20000:22000;m=o==="fukuoka"?190:230;}
+    if((a==="sapporo"&&b==="okinawa")||(b==="sapporo"&&a==="okinawa")){y=36000;m=330;}
+    return{min:m,yen:y,jr:"air",air:true,en:"Domestic flight (LCC or full-service), book early",ko:"국내선 항공(저가항공 또는 일반항공), 일찍 예약"};
+  }
+  var other,via;
+  if(a==="hakone"||b==="hakone"){other=a==="hakone"?b:a;var L2=leg("tokyo",other);return{min:Math.max(60,L2.min-20),yen:Math.max(500,L2.yen-1800),jr:L2.jr==="none"?"none":L2.jr,air:false,en:"Via Odawara: "+L2.en,ko:"오다와라 경유: "+L2.ko};}
+  if(a==="kanazawa"||b==="kanazawa"){other=a==="kanazawa"?b:a;var P=leg("kanazawa","osaka"),Q=leg("osaka",other);return{min:P.min+Q.min+30,yen:P.yen+Q.yen,jr:"cov",air:false,en:"Via Osaka: Thunderbird then Sanyo Shinkansen",ko:"오사카 경유: 선더버드 후 산요 신칸센"};}
+  return{min:300,yen:20000,jr:"cov",air:false,en:"Shinkansen",ko:"신칸센"};
+}
+
+/* ---------- state ---------- */
+var S={lang:"en",cur:"USD",curTouched:false,sel:["tokyo","kyoto","osaka"],origin:"ICN",A:2,C:1,start:"",end:"",style:"eco",lodge:"biz",plan:null,done:{}};
+var CURR={JPY:{r:1},USD:{r:150},EUR:{r:165},KRW:{r:0.108},CNY:{r:21}};
+var CUR_BY_LANG={ko:"KRW",en:"USD",ja:"JPY",zh:"CNY",es:"EUR",fr:"EUR"};
+try{var d=JSON.parse(localStorage.getItem("jp_done")||"{}");if(d&&typeof d==="object")S.done=d;}catch(e){}
+function saveDone(){try{localStorage.setItem("jp_done",JSON.stringify(S.done));}catch(e){}}
+try{var nl=(navigator.language||"en").slice(0,2).toLowerCase();if(LANGS[nl]){S.lang=nl;}S.cur=CUR_BY_LANG[S.lang];if(S.lang==="ko")S.origin="ICN";else if(S.lang==="ja")S.origin="TPE";else if(S.lang==="zh")S.origin="PVG";else if(S.lang==="es")S.origin="MAD";else if(S.lang==="fr")S.origin="CDG";else S.origin="LAX";}catch(e){}
+
+var $=function(id){return document.getElementById(id);};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});}
+function money(y){
+  var c=CURR[S.cur],v=y/c.r;
+  if(S.cur==="KRW")v=Math.round(v/1000)*1000;else if(S.cur==="JPY")v=Math.round(v/10)*10;else v=Math.round(v);
+  try{return new Intl.NumberFormat(LOC[S.lang],{style:"currency",currency:S.cur,maximumFractionDigits:0}).format(v);}catch(e){return v+" "+S.cur;}
+}
+function yen(y){return "¥"+Math.round(y).toLocaleString("en-US");}
+function m2(y){return S.cur==="JPY"?money(y):money(y)+" <span class=\"pill\">"+yen(y)+"</span>";}
+function rn(id){return R[id].n[S.lang]||R[id].n.en;}
+function pick(o){return o[S.lang]||o.en;}
+function koen(en,ko){return S.lang==="ko"?ko:en;}
+function hm(min){min=Math.round(min);var h=Math.floor(min/60),m=min%60;return h+"h"+(m<10?"0":"")+m;}
+function clock(min){var h=Math.floor(min/60),m=Math.round(min%60);if(m===60){h++;m=0;}return (h<10?"0":"")+h+":"+(m<10?"0":"")+m;}
+function hav(a,b,c,d){var R0=6371,p=Math.PI/180,dl=(c-a)*p,dn=(d-b)*p;var x=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a*p)*Math.cos(c*p)*Math.sin(dn/2)*Math.sin(dn/2);return 2*R0*Math.asin(Math.sqrt(x));}
+function pcost(blocks,d){var dp=[0],i,j;for(i=1;i<=d;i++){var best=1e12;for(j=0;j<blocks.length;j++){var prev=Math.max(0,i-blocks[j][0]);best=Math.min(best,dp[prev]+blocks[j][1]);}dp[i]=best;}return dp[d];}
+function addDays(iso,n){var p=iso.split("-");return new Date(Date.UTC(+p[0],+p[1]-1,+p[2]+n));}
+function fmtDate(dt){try{return new Intl.DateTimeFormat(LOC[S.lang],{month:"short",day:"numeric",weekday:"short",timeZone:"UTC"}).format(dt);}catch(e){return dt.toISOString().slice(0,10);}}
+function iso(dt){return dt.toISOString().slice(0,10);}
+
+/* ---------- static UI ---------- */
+function applyI18n(){
+  var els=document.querySelectorAll("[data-i]");
+  for(var i=0;i<els.length;i++)els[i].textContent=t(els[i].getAttribute("data-i"));
+  document.documentElement.lang=S.lang;
+  var sl=$("lang");sl.innerHTML="";for(var k in LANGS){var o=document.createElement("option");o.value=k;o.textContent=LANGS[k];if(k===S.lang)o.selected=true;sl.appendChild(o);}
+  var sc=$("cur");sc.innerHTML="";for(var c in CURR){var oc=document.createElement("option");oc.value=c;oc.textContent=c;if(c===S.cur)oc.selected=true;sc.appendChild(oc);}
+  var so=$("origin");so.innerHTML="";for(var ic in CITIES){var oo=document.createElement("option");oo.value=ic;oo.textContent=(S.lang==="ko"?CITIES[ic][1]:CITIES[ic][0])+" ("+ic+")";if(ic===S.origin)oo.selected=true;so.appendChild(oo);}
+  var sg=$("lodge");sg.innerHTML="";["hostel","biz","apt","ryokan","lux"].forEach(function(k2){var o2=document.createElement("option");o2.value=k2;o2.textContent=t("lg_"+k2);if(k2===S.lodge)o2.selected=true;sg.appendChild(o2);});
+  var sty=$("styles");sty.innerHTML="";
+  [["eco","eco","eco_d"],["com","com","com_d"],["lux","lux","lux_d"]].forEach(function(a){var b=document.createElement("button");b.type="button";b.className="sty";b.setAttribute("aria-pressed",S.style===a[0]);b.innerHTML="<b>"+esc(t(a[1]))+"</b><span>"+esc(t(a[2]))+"</span>";b.onclick=function(){S.style=a[0];applyI18n();draw();};sty.appendChild(b);});
+  drawChips();drawMap();
+}
+function drawChips(){
+  var c=$("chips");c.innerHTML="";
+  Object.keys(R).forEach(function(id){var b=document.createElement("button");b.type="button";b.className="chip";b.setAttribute("aria-pressed",S.sel.indexOf(id)>=0);b.textContent=rn(id);b.onclick=function(){toggle(id);};c.appendChild(b);});
+}
+function toggle(id){var i=S.sel.indexOf(id);if(i>=0)S.sel.splice(i,1);else S.sel.push(id);drawChips();drawMap();}
+
+var LAND=[
+ [[141.7,45.4],[143.5,44.3],[145.3,44.0],[145.6,43.3],[144.3,42.9],[143.3,42.0],[141.4,42.6],[140.3,41.8],[140.0,42.6],[140.4,43.3],[141.4,43.8],[141.5,45.0]],
+ [[140.9,41.4],[141.5,40.5],[142.0,39.5],[141.9,38.3],[141.0,37.0],[140.9,36.0],[140.8,35.7],[139.9,35.0],[139.8,35.3],[139.2,35.2],[138.8,34.6],[138.2,34.7],[137.0,34.6],[136.9,34.3],[136.0,33.5],[135.8,33.4],[135.1,34.1],[135.2,34.6],[134.0,34.7],[132.5,34.2],[131.0,33.9],[130.9,34.4],[131.8,34.7],[133.0,35.5],[134.5,35.6],[135.8,35.6],[136.7,36.2],[136.8,37.4],[137.3,37.2],[138.5,37.4],[139.5,38.2],[140.0,39.6],[139.9,40.5],[140.3,41.0]],
+ [[132.5,33.9],[133.7,34.3],[134.7,34.2],[134.2,33.5],[133.0,32.8],[132.5,33.3]],
+ [[130.9,33.9],[131.8,33.5],[131.7,32.5],[131.4,31.4],[130.7,31.0],[130.2,31.4],[130.2,32.5],[129.8,33.2],[130.3,33.6]]
+];
+function px(lon,lat){return[(lon-128.5)*21+10,(45.8-lat)*24+10];}
+function pos(id){return id==="okinawa"?[62,418]:px(R[id].lon,R[id].lat);}
+function drawMap(){
+  var svg=$("map"),h="";
+  LAND.forEach(function(poly){h+="<polygon class=\"land\" points=\""+poly.map(function(p){var q=px(p[0],p[1]);return q[0].toFixed(1)+","+q[1].toFixed(1);}).join(" ")+"\"/>";});
+  h+="<rect class=\"inset\" x=\"14\" y=\"392\" width=\"96\" height=\"46\" rx=\"6\"/><ellipse class=\"land\" cx=\"70\" cy=\"420\" rx=\"22\" ry=\"6\" transform=\"rotate(-25 70 420)\"/>";
+  var order=S.plan&&S.plan.order?S.plan.order:null;
+  if(order&&order.length>1){var pts=order.map(function(id){var p=pos(id);return p[0]+","+p[1];}).join(" ");h+="<polyline class=\"route\" points=\""+pts+"\"/>";}
+  Object.keys(R).forEach(function(id){
+    var p=pos(id),on=S.sel.indexOf(id)>=0,l=MAPLL[id],idx=order?order.indexOf(id):-1;
+    h+="<g class=\"dot"+(on?" on":"")+"\" data-id=\""+id+"\" tabindex=\"0\" role=\"button\" aria-pressed=\""+on+"\" aria-label=\""+esc(rn(id))+"\">";
+    h+="<circle cx=\""+p[0]+"\" cy=\""+p[1]+"\" r=\"16\" fill=\"transparent\"/><circle class=\"vis\" cx=\""+p[0]+"\" cy=\""+p[1]+"\" r=\"8\"/>";
+    if(idx>=0)h+="<text class=\"n\" x=\""+p[0]+"\" y=\""+(p[1]+3.5)+"\">"+(idx+1)+"</text>";
+    h+="<text x=\""+(p[0]+l[0])+"\" y=\""+(p[1]+l[1])+"\" text-anchor=\""+l[2]+"\">"+esc(rn(id))+"</text></g>";
+  });
+  svg.innerHTML=h;
+  var gs=svg.querySelectorAll(".dot");
+  for(var i=0;i<gs.length;i++){(function(g){g.onclick=function(){toggle(g.getAttribute("data-id"));};g.onkeydown=function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();toggle(g.getAttribute("data-id"));}};})(gs[i]);}
+}
+
+/* ---------- planning ---------- */
+function entryMin(origin,id){var C=CITIES[origin],g=GW[R[id].gw];return hav(C[2],C[3],g[1],g[2])/820*60+50+R[id].gm;}
+function bestOrder(sel,origin){
+  if(sel.length===1)return sel.slice();
+  var best=null,bm=1e12;
+  function cost(arr){var m=entryMin(origin,arr[0])+entryMin(origin,arr[arr.length-1]);for(var i=0;i<arr.length-1;i++)m+=leg(arr[i],arr[i+1]).min;return m;}
+  if(sel.length<=8){
+    (function perm(arr,rest){if(!rest.length){var c=cost(arr);if(c<bm){bm=c;best=arr.slice();}return;}for(var i=0;i<rest.length;i++){var r2=rest.slice();var x=r2.splice(i,1)[0];arr.push(x);perm(arr,r2);arr.pop();}})([],sel.slice());
+    return best;
+  }
+  var left=sel.slice(),cur=left.splice(0,1)[0],out=[cur];
+  while(left.length){var bi=0,bv=1e12;for(var j=0;j<left.length;j++){var v=leg(cur,left[j]).min;if(v<bv){bv=v;bi=j;}}cur=left.splice(bi,1)[0];out.push(cur);}
+  return out;
+}
+function alloc(order,D){
+  var tw=0,i;order.forEach(function(id){tw+=R[id].w;});
+  var base=order.map(function(){return 1;}),rem=D-order.length;
+  var quota=order.map(function(id){return R[id].w/tw*D;});
+  var give=order.map(function(_,k){return Math.max(1,Math.floor(quota[k]));});
+  var sum=give.reduce(function(a,b){return a+b;},0);
+  while(sum>D){var mi=-1,mv=-1;for(i=0;i<give.length;i++){if(give[i]>1&&give[i]-quota[i]>mv){mv=give[i]-quota[i];mi=i;}}if(mi<0)break;give[mi]--;sum--;}
+  while(sum<D){var bi=0,bv=-1;for(i=0;i<give.length;i++){var f=quota[i]-give[i];if(f>bv){bv=f;bi=i;}}give[bi]++;sum++;}
+  return give;
+}
+function build(){
+  var msg=$("msg");msg.hidden=true;
+  S.A=Math.max(1,Math.min(30,parseInt($("adults").value,10)||1));
+  S.C=Math.max(0,Math.min(30,parseInt($("children").value,10)||0));
+  S.origin=$("origin").value;S.lodge=$("lodge").value;S.start=$("start").value;S.end=$("end").value;
+  function bad(k,extra){msg.textContent=t(k)+(extra||"");msg.hidden=false;S.plan=null;$("out").innerHTML="";drawMap();}
+  if(!S.sel.length)return bad("noRegion");
+  if(!S.start||!S.end)return bad("badDates");
+  var D=Math.round((addDays(S.end,0)-addDays(S.start,0))/864e5)+1;
+  if(D<1)return bad("badDates");
+  if(D>30)return bad("tooLong");
+  if(D<S.sel.length)return bad("minDays"," "+S.sel.length);
+  var st=STY[S.style],A=S.A,C=S.C,pw=A+0.5*C,aw=A+0.75*C,persons=A+C;
+  var order=bestOrder(S.sel,S.origin),give=alloc(order,D);
+
+  /* calendar */
+  var cal=[],di=0;
+  order.forEach(function(id,ri){for(var k=0;k<give[ri];k++){cal.push({i:di,date:addDays(S.start,di),rid:id,ri:ri,k:k,first:k===0&&ri>0,arrival:di===0,departure:di===D-1});di++;}});
+  var base=st.cap-(C>0?1:0);if(base<2)base=2;
+  cal.forEach(function(d){d.cap=base;if(d.arrival||d.departure||d.first)d.cap=Math.max(1,base-1);if(d.arrival&&d.departure)d.cap=1;});
+
+  /* spots to days */
+  var byRegion={};
+  order.forEach(function(id,ri){
+    var days=cal.filter(function(d){return d.rid===id;});
+    var total=days.reduce(function(a,d){return a+d.cap;},0);
+    var all=SP[id].map(function(s,ix){return{s:s,ix:ix};});
+    var chosen=all.slice().sort(function(a,b){return a.s[6]-b.s[6]||a.ix-b.ix;}).slice(0,total).sort(function(a,b){return a.s[5]-b.s[5]||a.ix-b.ix;});
+    var p=0;
+    days.forEach(function(d){d.spots=[];while(d.spots.length<d.cap&&p<chosen.length){d.spots.push(chosen[p].s);p++;}});
+    byRegion[id]={days:days,spots:chosen.map(function(c){return c.s;})};
+  });
+
+  /* region costs & pass compare */
+  var cost={flight:0,air:0,rail:0,local:0,adm:0,food:0,lodge:0,priv:0};
+  var lux=S.style==="lux";
+  var regionInfo={};
+  order.forEach(function(id,ri){
+    var r=R[id],d=give[ri],spots=byRegion[id].spots;
+    var admAll=0,admUnc=0;spots.forEach(function(s){admAll+=s[4]*(A+0.5*C);admUnc+=(s[8]?0:s[4])*(A+0.5*C);});
+    var noTransit,passTransit=0,hasPass=!!r.pb;
+    if(r.car){noTransit=r.car*Math.ceil(persons/5)*d;passTransit=noTransit;}
+    else noTransit=((r.td*d)+(r.tf||0))*pw;
+    var passCost=hasPass?pcost(r.pb,d)*pw:0;
+    var noP=noTransit+admAll, withP=hasPass?passCost+admUnc:noP;
+    var use=hasPass&&withP<noP&&!lux;
+    regionInfo[id]={hasPass:hasPass,noP:noP,withP:withP,use:use,admAll:admAll,admUnc:admUnc,noTransit:noTransit,passCost:passCost,car:!!r.car};
+    if(lux){
+      cost.priv+=Math.ceil(persons/6)*70000*d;cost.adm+=admAll;
+    }else if(use){cost.local+=passCost;cost.adm+=admUnc;}
+    else{cost.local+=noTransit;cost.adm+=admAll;}
+  });
+
+  /* legs */
+  var legs=[],airTotal=0;
+  for(var li=0;li<order.length-1;li++){
+    var L=leg(order[li],order[li+1]);L.from=order[li];L.to=order[li+1];
+    L.day=cal.filter(function(d){return d.rid===order[li+1];})[0].i;legs.push(L);
+    if(L.air){airTotal+=L.yen*aw;}
+  }
+  cost.air=airTotal;
+
+  /* JR analysis */
+  var jr=jrAnalysis(legs,pw,lux);
+  cost.rail=jr.best.total-0;
+
+  /* flights */
+  var oc=CITIES[S.origin],g1=R[order[0]].gw,g2=R[order[order.length-1]].gw;
+  var km1=hav(oc[2],oc[3],GW[g1][1],GW[g1][2]);
+  var cls=lux?3.6:S.style==="com"?1.6:1;
+  var usd=(150+km1*0.075)*cls;if(g1!==g2)usd*=1.1;
+  var fareA=usd*CURR.USD.r;
+  cost.flight=fareA*(A+0.75*C);
+  var fl={g1:g1,g2:g2,km:km1,min:km1/820*60+40,fareA:fareA};
+
+  /* lodging */
+  var lg=LG[S.lodge],rooms=0;
+  var nightsBy=order.map(function(id,ri){return give[ri]-(ri===order.length-1?1:0);});
+  order.forEach(function(id,ri){
+    var n=nightsBy[ri];if(n<=0)return;var f=R[id].lf,y;
+    if(lg.unit==="p"){y=lg.y*f*persons*(S.lodge==="ryokan"?1:1);if(C>0)y-=lg.y*f*C*0.3;}
+    else{var need=A+C*0.5;var rm=Math.max(1,Math.ceil(need/lg.cap));if(rm>rooms)rooms=rm;y=lg.y*f*rm;}
+    cost.lodge+=y*n;
+  });
+  /* food */
+  var foodDay=FOODDAY[S.style]*(A+0.6*C);
+  cost.food=foodDay*D;
+  if(S.lodge==="ryokan"){var rn2=nightsBy.reduce(function(a,b){return a+Math.max(0,b);},0);cost.food-=foodDay*0.55*rn2;}
+  if(lux){cost.priv+=Math.ceil(persons/6)*40000*2;}
+
+  var total=0;for(var kk in cost)total+=cost[kk];
+  S.plan={order:order,give:give,cal:cal,byRegion:byRegion,regionInfo:regionInfo,legs:legs,jr:jr,fl:fl,cost:cost,total:total,D:D,rooms:rooms,nightsBy:nightsBy,pw:pw,aw:aw};
+  draw();
+}
+function jrAnalysis(legs,pw,lux){
+  var f=lux?1.4:1;
+  var rail=legs.filter(function(L){return !L.air;});
+  var cash=0;rail.forEach(function(L){cash+=L.yen*f*pw;});
+  var cov=rail.filter(function(L){return L.jr==="cov"||L.jr==="part";});
+  var opts=[{id:"cash",name:t("jr_cash"),total:cash}];
+  if(cov.length){
+    var d0=Math.min.apply(null,cov.map(function(L){return L.day;})),d1=Math.max.apply(null,cov.map(function(L){return L.day;}));
+    var span=d1-d0+1,dur=span<=7?7:span<=14?14:span<=21?21:0;
+    if(dur){
+      var P=lux?{7:[74000,37000],14:[116000,58000],21:[147000,74000]}:{7:[53000,27000],14:[84000,42000],21:[105000,53000]};
+      var sS=P[dur],A=S.A,C=S.C;
+      var passCost=sS[0]*A+sS[1]*C;
+      var covCash=0;cov.forEach(function(L){covCash+=L.yen*f*pw;});
+      opts.push({id:"nat",name:t("jr_nat")+" "+dur+(S.lang==="ko"?"일":"d")+(lux?" Green":""),total:cash-covCash+passCost,note:span});
+    }
+    if(!lux){
+      [["kwide","JR Kansai WIDE Area Pass (5d)",12000,5,["kyoto","osaka"]],["khiro","JR Kansai-Hiroshima Area Pass (5d)",17000,5,["kyoto","osaka","hiroshima"]],["sanyo","JR Sanyo-San'in Area Pass (7d)",23000,7,["osaka","hiroshima","fukuoka"]]].forEach(function(p){
+        var inA=cov.filter(function(L){return p[4].indexOf(L.from)>=0&&p[4].indexOf(L.to)>=0;});
+        if(!inA.length)return;
+        var a0=Math.min.apply(null,inA.map(function(L){return L.day;})),a1=Math.max.apply(null,inA.map(function(L){return L.day;}));
+        if(a1-a0+1>p[3])return;
+        var cc=0;inA.forEach(function(L){cc+=L.yen*pw;});
+        var pc=p[2]*pw;
+        opts.push({id:p[0],name:p[1],total:cash-cc+pc});
+      });
+    }
+  }
+  var best=opts[0];opts.forEach(function(o){if(o.total<best.total-1)best=o;});
+  return{opts:opts,best:best,cash:cash,hasRail:rail.length>0,hasCov:cov.length>0};
+}
+
+/* ---------- render ---------- */
+function draw(){
+  drawMap();
+  var P=S.plan,out=$("out");
+  if(!P){return;}
+  var A=S.A,C=S.C,h="";
+  /* summary */
+  var nights=P.D-1;
+  h+="<section class=\"panel\"><h2>"+esc(t("r_sum"))+"</h2><div class=\"chain\">";
+  h+="<span class=\"pill\">"+esc(S.origin)+"</span><span class=\"arr\">✈</span>";
+  P.order.forEach(function(id,i){h+=(i?"<span class=\"arr\">→</span>":"")+"<span>"+(i+1)+". "+esc(rn(id))+" <small class=\"num\">"+P.give[i]+(S.lang==="ko"?"일":"d")+"</small></span>";});
+  h+="<span class=\"arr\">✈</span></div>";
+  h+="<p class=\"hint\">"+fmtDate(addDays(S.start,0))+" – "+fmtDate(addDays(S.end,0))+" · "+P.D+" "+esc(t("daysL"))+" / "+nights+" "+esc(t("nightsL"))+" · "+A+" + "+C+"</p>";
+  h+="<div class=\"sumgrid\"><div class=\"stat\"><small>"+esc(t("total"))+"</small><b>"+money(P.total)+"</b></div><div class=\"stat\"><small>"+esc(t("perP"))+"</small><b>"+money(P.total/(A+C))+"</b></div></div>";
+  var cats=[["flight","c_flight"],["air","c_air"],["rail","c_rail"],["local","c_local"],["priv","c_priv"],["adm","c_adm"],["food","c_food"],["lodge","c_lodge"]],mx=0;
+  cats.forEach(function(c){mx=Math.max(mx,P.cost[c[0]]);});
+  cats.forEach(function(c){var v=P.cost[c[0]];if(v<=0)return;h+="<div class=\"bar\"><span>"+esc(t(c[1]))+"</span><span class=\"tr\"><i style=\"width:"+Math.max(2,v/mx*100).toFixed(1)+"%\"></i></span><span class=\"num\">"+money(v)+"</span></div>";});
+  if(S.cur!=="JPY")h+="<p class=\"hint\">"+esc(t("fx"))+" 1 USD = ¥150, 1 EUR = ¥165, ¥1 = ₩9.3, 1 CNY = ¥21</p>";
+  if(S.style==="lux")h+="<p class=\"hint\">"+esc(t("privNote"))+"</p>";
+  h+="</section>";
+
+  /* flights */
+  var fl=P.fl,oc=CITIES[S.origin];
+  var gurl="https://www.google.com/travel/flights?q="+encodeURIComponent("Flights from "+oc[0]+" to "+GWN[fl.g1].en+" on "+S.start+" through "+S.end);
+  h+="<section class=\"panel\"><h2>"+esc(t("fl_title"))+"</h2><div class=\"tablewrap\"><table><tbody>";
+  h+="<tr><th>"+esc(t("fl_in"))+"</th><td>"+esc(oc[0])+" ("+S.origin+") → "+esc(koen(GWN[fl.g1].en,GWN[fl.g1].ko))+" "+GW[fl.g1][0]+"</td></tr>";
+  h+="<tr><th>"+esc(t("fl_out"))+"</th><td>"+esc(koen(GWN[fl.g2].en,GWN[fl.g2].ko))+" "+GW[fl.g2][0]+" → "+esc(oc[0])+"</td></tr>";
+  h+="<tr><th>"+esc(t("fl_time"))+"</th><td class=\"num\">"+hm(fl.min)+" ("+Math.round(fl.km).toLocaleString("en-US")+" km)</td></tr>";
+  h+="<tr><th>"+esc(t("fl_fare"))+"</th><td>"+m2(fl.fareA*0.8)+" – "+m2(fl.fareA*1.3)+"</td></tr>";
+  h+="</tbody></table></div><p class=\"hint\">"+esc(t("fl_note"))+"</p><p><a href=\""+gurl+"\" target=\"_blank\" rel=\"noopener\" style=\"color:var(--accent);font-weight:700\">"+esc(t("fl_search"))+" ↗</a></p></section>";
+
+  /* legs + JR */
+  if(P.legs.length){
+    h+="<section class=\"panel\"><h2>"+esc(t("route"))+"</h2><div class=\"tablewrap\"><table><thead><tr><th>"+esc(t("leg_from"))+"</th><th>"+esc(t("leg_line"))+"</th><th>"+esc(t("leg_time"))+"</th><th class=\"r\">"+esc(t("leg_fare"))+"</th><th>"+esc(t("leg_jr"))+"</th></tr></thead><tbody>";
+    P.legs.forEach(function(L){
+      var jrt=L.jr==="cov"?t("jr_cov"):L.jr==="part"?t("jr_part"):L.jr==="none"?t("jr_none"):t("jr_air");
+      h+="<tr><td>"+esc(rn(L.from))+" → "+esc(rn(L.to))+"</td><td>"+esc(koen(L.en,L.ko))+"</td><td class=\"num\">"+hm(L.min)+"</td><td class=\"r num\">"+yen(L.yen)+"</td><td>"+esc(jrt)+"</td></tr>";
+    });
+    h+="</tbody></table></div></section>";
+    h+="<section class=\"panel\"><h2>"+esc(t("jr_title"))+"</h2>";
+    if(!P.jr.hasCov&&P.jr.opts.length===1)h+="<p>"+esc(t("jr_none_needed"))+"</p>";
+    else{
+      h+="<div class=\"tablewrap\"><table><thead><tr><th>"+esc(t("jr_opt"))+"</th><th class=\"r\">"+esc(t("jr_cost"))+"</th><th class=\"r\">"+esc(t("jr_vs"))+"</th></tr></thead><tbody>";
+      P.jr.opts.forEach(function(o){var diff=P.jr.cash-o.total,isB=o===P.jr.best;
+        h+="<tr><td>"+(isB?"<span class=\"best\">★ "+esc(t("jr_best"))+"</span> ":"")+esc(o.name)+"</td><td class=\"r num\">"+m2(o.total)+"</td><td class=\"r num\">"+(o.id==="cash"?"–":(diff>=0?esc(t("saves"))+" "+money(diff):esc(t("costsmore"))+" "+money(-diff)))+"</td></tr>";});
+      h+="</tbody></table></div><p><b>"+esc(t("jr_pick"))+"</b> "+esc(P.jr.best.name)+"</p>";
+    }
+    h+="<p class=\"hint\">"+esc(t("jr_note"))+"</p></section>";
+  }
+
+  /* regions */
+  h+="<div class=\"prog\" id=\"prog\"></div>";
+  h+="<section aria-label=\""+esc(t("days_sec"))+"\" style=\"display:flex;flex-direction:column;gap:14px\">";
+  P.order.forEach(function(id,ri){
+    var r=R[id],info=P.regionInfo[id],days=P.byRegion[id].days;
+    h+="<article class=\"region\"><div class=\"rhead\"><div class=\"row\"><h3>"+(ri+1)+". "+esc(rn(id))+"</h3><span class=\"pill\">"+P.give[ri]+" "+esc(t("daysL"))+"</span>";
+    if(P.nightsBy[ri]>0)h+="<span class=\"pill\">"+esc(t("lodgeL"))+" "+P.nightsBy[ri]+" "+esc(t("nightsL"))+(P.rooms&&LG[S.lodge].unit==="room"?" · "+P.rooms+" "+esc(t("rooms")):"")+"</span>";
+    h+="</div><div class=\"hint\" style=\"margin:0\">"+esc(koen(r.food.en,r.food.ko))+"</div>";
+    h+="<div style=\"font-size:13px;font-weight:700;margin-top:4px\">"+esc(t("pass_cmp"))+(r.pn?" · "+esc(koen(r.pn.en,r.pn.ko)):"")+"</div>";
+    if(info.hasPass){
+      var df=info.noP-info.withP;
+      h+="<div class=\"passbox\"><div>"+esc(t("withoutP"))+"<b>"+money(info.noP)+"</b></div><div>"+esc(t("withP"))+"<b>"+money(info.withP)+"</b></div><div>"+esc(t("diff"))+"<b class=\""+(df>0?"best":"")+"\">"+(df>0?"− ":"+ ")+money(Math.abs(df))+"</b></div></div>";
+      h+="<div class=\""+(df>0?"best":"")+"\" style=\"font-size:13px\">"+esc(df>0?t("usePass"):t("skipPass"))+"</div>";
+    }else{
+      h+="<div class=\"passbox\"><div>"+esc(koen("Rental car + entries","렌터카 + 입장료"))+"<b>"+money(info.noP)+"</b></div></div><div class=\"hint\" style=\"margin:0\">"+esc(t("noPass"))+"</div>";
+    }
+    h+="</div>";
+    days.forEach(function(d,di){
+      var tag=d.arrival?t("arrive"):d.departure?t("depart"):d.first?t("travel"):"";
+      h+="<div class=\"day\"><div class=\"dayh\"><b>"+esc(S.lang==="en"||S.lang==="es"||S.lang==="fr"?t("day")+" "+(d.i+1):(S.lang==="zh"?t("day")+(d.i+1)+"天":(d.i+1)+t("day")))+"</b><span class=\"num\" style=\"color:var(--muted)\">"+esc(fmtDate(d.date))+"</span>"+(tag?"<span class=\"pill\">"+esc(tag)+"</span>":"")+"</div>";
+      if(d.first){var L0=P.legs[ri-1];h+="<div class=\"move\">"+esc(t("moveto"))+" "+esc(rn(L0.from))+" → "+esc(rn(L0.to))+" · "+esc(koen(L0.en,L0.ko))+" · "+hm(L0.min)+" · "+yen(L0.yen)+"</div>";}
+      var cur=d.arrival?14*60:d.departure?9*60:9.5*60,lunch=!!d.arrival,mealC=MEAL[S.style];
+      if(!d.spots.length)h+="<div class=\"free\">"+esc(t("free"))+"</div>";
+      d.spots.forEach(function(s){
+        if(!lunch&&cur>=11*60+45){h+="<div class=\"meal\">"+clock(cur)+" · "+esc(t("lunch"))+": "+esc(koen(r.food.en,r.food.ko))+" · "+yen(mealC[0])+"–"+yen(mealC[0]*2)+"</div>";cur+=70;lunch=true;}
+        var nm=s[2],jp=s[1],ko=s[3];
+        var costTxt=s[4]===0?t("admFree"):(s[8]&&info.use&&!(S.style==="lux")?yen(s[4])+" → "+t("covered"):yen(s[4]));
+        var chk=!!S.done[s[0]];
+        h+="<div class=\"spot"+(chk?" checked":"")+"\" id=\"sp-"+s[0]+"\"><span class=\"tm\">"+clock(cur)+" · ~"+s[7]+"h</span><span class=\"nm\">"+esc(S.lang==="ko"?ko:nm)+"</span><span class=\"jp\">"+esc(jp)+(S.lang==="ko"?" · "+esc(nm):"")+"</span>";
+        h+="<p>"+esc(S.lang==="ko"?s[10]:s[9])+"</p><p class=\"tip\"><b>"+esc(t("tipL"))+":</b> "+esc(S.lang==="ko"?s[12]:s[11])+"</p>";
+        h+="<div class=\"cost\">"+esc(t("adm"))+": "+esc(costTxt)+"</div>";
+        h+="<label class=\"done\"><input type=\"checkbox\" data-sp=\""+s[0]+"\""+(chk?" checked":"")+"> "+esc(t("done"))+"</label></div>";
+        cur+=s[7]*60+30;
+      });
+      if(!d.departure){
+        if(!lunch&&d.spots.length&&cur<15*60){h+="<div class=\"meal\">"+clock(Math.max(cur,12*60))+" · "+esc(t("lunch"))+": "+esc(koen(r.food.en,r.food.ko))+" · "+yen(mealC[0])+"–"+yen(mealC[0]*2)+"</div>";}
+        h+="<div class=\"meal\">"+clock(Math.max(cur,18*60))+" · "+esc(t("dinner"))+": "+esc(koen(r.food.en,r.food.ko))+" · "+yen(mealC[1])+"–"+yen(mealC[1]*2)+"</div>";
+      }
+      h+="</div>";
+    });
+    h+="</article>";
+  });
+  h+="</section>";
+
+  /* products */
+  h+="<section class=\"panel\"><h2>"+esc(t("prods"))+"</h2><div class=\"prod\">";
+  P.order.forEach(function(id){
+    var list=(S.style==="lux")?R[id].prod.lux:R[id].prod.eco;
+    list.forEach(function(p){
+      var url="https://www.getyourguide.com/s/?q="+encodeURIComponent(p[3]);
+      h+="<a href=\""+url+"\" target=\"_blank\" rel=\"noopener\"><small>"+esc(rn(id))+"</small><b>"+esc(koen(p[0],p[1]))+"</b><small class=\"num\">"+esc(p[2])+"</small><small style=\"color:var(--accent);font-weight:700\">"+esc(t("search"))+" ↗</small></a>";
+    });
+  });
+  h+="</div></section><p class=\"foot\">"+esc(t("disc"))+"</p>";
+  out.innerHTML=h;
+  bindChecks();updProg();
+}
+function bindChecks(){
+  var cs=$("out").querySelectorAll("input[data-sp]");
+  for(var i=0;i<cs.length;i++){cs[i].onchange=function(){var id=this.getAttribute("data-sp");if(this.checked)S.done[id]=1;else delete S.done[id];saveDone();var card=$("sp-"+id);if(card)card.classList.toggle("checked",this.checked);updProg();};}
+}
+function updProg(){
+  var p=$("prog");if(!p||!S.plan)return;var tot=0,dn=0;
+  S.plan.order.forEach(function(id){S.plan.byRegion[id].spots.forEach(function(s){tot++;if(S.done[s[0]])dn++;});});
+  p.innerHTML="<span>"+esc(t("prog"))+" "+dn+" / "+tot+"</span><span class=\"tr\"><i style=\"width:"+(tot?dn/tot*100:0)+"%\"></i></span>";
+}
+
+/* ---------- init ---------- */
+(function(){
+  var today=new Date();var s=new Date(Date.UTC(today.getFullYear(),today.getMonth(),today.getDate()+30));
+  S.start=iso(s);S.end=iso(addDays(S.start,6));
+  $("start").value=S.start;$("end").value=S.end;
+})();
+$("lang").onchange=function(){S.lang=this.value;if(!S.curTouched)S.cur=CUR_BY_LANG[S.lang];readForm();applyI18n();restoreForm();if(S.plan)build();};
+$("cur").onchange=function(){S.cur=this.value;S.curTouched=true;draw();};
+$("go").onclick=build;
+function readForm(){S.A=parseInt($("adults").value,10)||1;S.C=parseInt($("children").value,10)||0;S.origin=$("origin").value;S.lodge=$("lodge").value;S.start=$("start").value;S.end=$("end").value;}
+function restoreForm(){$("adults").value=S.A;$("children").value=S.C;$("start").value=S.start;$("end").value=S.end;}
+$("origin").onchange=function(){S.origin=this.value;};
+applyI18n();
+build();
+})();
+</script>
+
+</body></html>
